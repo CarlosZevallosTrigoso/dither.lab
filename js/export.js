@@ -36,10 +36,8 @@ async function exportGifCore(p, media, config, startTime, endTime, fps, progress
         p.redraw();
         await new Promise(r => setTimeout(r, 50));
         
-        // Capturar canvas
-        const canvas = p.canvas.elt;
-        const ctx = canvas.getContext('2d');
-        const imageData = ctx.getImageData(0, 0, p.width, p.height);
+        // Capturar canvas - p.canvas ya es el elemento DOM en instance mode
+        const imageData = p.drawingContext.getImageData(0, 0, p.width, p.height);
         
         gif.addFrame(imageData, {delay: frameDelay});
         
