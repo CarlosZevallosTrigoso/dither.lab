@@ -288,7 +288,7 @@ function drawDither(p, buffer, src, w, h, cfg, lumaLUT, bayerLUT) {
   buffer.updatePixels();
 }
 
-// Algoritmo Riemersma (Space-filling curve)
+// Algoritmo Riemersma (Space-filling curve) - Versión simplificada
 function drawRiemersma(p, buffer, src, w, h, cfg, lumaLUT) {
   const scale = cfg.ditherScale;
   const pw = Math.floor(w / scale);
@@ -298,55 +298,40 @@ function drawRiemersma(p, buffer, src, w, h, cfg, lumaLUT) {
   buffer.loadPixels();
   
   const pix = new Uint8ClampedArray(buffer.pixels);
+  const levels = cfg.colorCount;
+  const step = 255 / (levels > 1 ? levels - 1 : 1);
   
-  // Crear curva de Hilbert simple (orden limitado para rendimiento)
-  const hilbertPath = generateSimpleHilbertPath(pw, ph);
+  let carryR = 0, carryG = 0, carryB = 0;
   
-  // Buffer de errores con historial (característica de Riemersma)
-  const errorBuffer = [];
-  const bufferSize = 16; // Tamaño del buffer de errores
-  let errorSum = [0, 0, 0];
-  
-  const decayWeights = Array.from({length: bufferSize}, (_, i) => 
-    Math.exp(-i * 0.25) // Decay exponencial
-  );
-  
-  for (const [x, y] of hilbertPath) {
-    const i = (y * pw + x) * 4;
+  // Simple serpentina con carry
+  for (let y = 0; y < ph; y++) {
+    const isReversed = y % 2 === 1;
+    const xStart = isReversed ? pw - 1 : 0;
+    const xEnd = isReversed ? -1 : pw;
+    const xStep = isReversed ? -1 : 1;
     
-    // Calcular error promedio ponderado del buffer
-    const weightedError = [0, 0, 0];
-    for (let j = 0; j < errorBuffer.length; j++) {
-      const weight = decayWeights[j];
-      weightedError[0] += errorBuffer[j][0] * weight;
-      weightedError[1] += errorBuffer[j][1] * weight;
-      weightedError[2] += errorBuffer[j][2] * weight;
-    }
-    
-    // Aplicar error
-    const oldR = Math.min(255, Math.max(0, pix[i] + weightedError[0] * cfg.diffusionStrength));
-    const oldG = Math.min(255, Math.max(0, pix[i + 1] + weightedError[1] * cfg.diffusionStrength));
-    const oldB = Math.min(255, Math.max(0, pix[i + 2] + weightedError[2] * cfg.diffusionStrength));
-    
-    // Cuantizar usando la paleta
-    const luma = oldR * 0.299 + oldG * 0.587 + oldB * 0.114;
-    const [newR, newG, newB] = lumaLUT.map(luma);
-    
-    pix[i] = newR;
-    pix[i + 1] = newG;
-    pix[i + 2] = newB;
-    
-    // Calcular error actual
-    const currentError = [
-      oldR - newR,
-      oldG - newG,
-      oldB - newB
-    ];
-    
-    // Agregar al buffer (FIFO)
-    errorBuffer.unshift(currentError);
-    if (errorBuffer.length > bufferSize) {
-      errorBuffer.pop();
+    for (let x = xStart; x !== xEnd; x += xStep) {
+      const i = (y * pw + x) * 4;
+      
+      const oldR = Math.min(255, Math.max(0, pix[i] + carryR));
+      const oldG = Math.min(255, Math.max(0, pix[i + 1] + carryG));
+      const oldB = Math.min(255, Math.max(0, pix[i + 2] + carryB));
+      
+      const oldLuma = oldR * 0.299 + oldG * 0.587 + oldB * 0.114;
+      const newLuma = Math.round(oldLuma / step) * step;
+      const [r, g, b] = lumaLUT.map(newLuma);
+      
+      pix[i] = r;
+      pix[i + 1] = g;
+      pix[i + 2] = b;
+      
+      const errR = (oldR - r) * cfg.diffusionStrength;
+      const errG = (oldG - g) * cfg.diffusionStrength;
+      const errB = (oldB - b) * cfg.diffusionStrength;
+      
+      carryR = errR * 0.75;
+      carryG = errG * 0.75;
+      carryB = errB * 0.75;
     }
   }
   
@@ -446,69 +431,6 @@ function drawVariableError(p, buffer, src, w, h, cfg, lumaLUT) {
 }
 
 // ============================================================================
-// UTILIDADES PARA HILBERT CURVE (SIMPLIFICADO)
+// UTILIDADES
 // ============================================================================
-
-function generateSimpleHilbertPath(w, h) {
-  const path = [];
-  const maxSize = Math.max(w, h);
-  
-  // Si es muy grande, usar orden menor para rendimiento
-  const order = Math.min(Math.floor(Math.log2(maxSize)), 6);
-  const n = Math.pow(2, order);
-  
-  // Generar todos los puntos de la curva
-  const totalPoints = n * n;
-  
-  for (let d = 0; d < totalPoints; d++) {
-    const [x, y] = d2xy(n, d);
-    
-    // Solo agregar si está dentro de los límites reales
-    if (x < w && y < h) {
-      path.push([x, y]);
-    }
-  }
-  
-  // Si la curva no cubre toda el área, agregar el resto en orden raster
-  const visitedSet = new Set(path.map(([x, y]) => `${x},${y}`));
-  
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const key = `${x},${y}`;
-      if (!visitedSet.has(key)) {
-        path.push([x, y]);
-      }
-    }
-  }
-  
-  return path;
-}
-
-function d2xy(n, d) {
-  let x = 0, y = 0;
-  let s = 1;
-  
-  while (s < n) {
-    const rx = 1 & Math.floor(d / 2);
-    const ry = 1 & (d ^ rx);
-    
-    // Rotar/voltear cuadrante apropiadamente
-    if (ry === 0) {
-      if (rx === 1) {
-        x = s - 1 - x;
-        y = s - 1 - y;
-      }
-      // Swap x e y
-      const t = x;
-      x = y;
-      y = t;
-    }
-    
-    x += s * rx;
-    y += s * ry;
-    d = Math.floor(d / 4);
-    s *= 2;
-  }
-  
-  return [x, y];
-}
+// (Las funciones de Hilbert se han eliminado - Riemersma ahora usa patrón simplificado)
