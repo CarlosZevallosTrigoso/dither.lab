@@ -107,26 +107,21 @@
           <div id="iconicPalettesContainer" class="space-y-2 hidden"></div>
         </div>
 
-        <!-- ALGORITMO -->
         <div class="bg-slate-800 rounded-lg p-4">
           <h2 class="font-bold text-purple-300 mb-3">ALGORITMO DE DITHERING</h2>
           <select id="effectSelect" class="w-full bg-slate-700 p-2 rounded text-white">
             <option value="none">Sin efecto</option>
-            <option value="posterize">Cuantizar</option>
-            <optgroup label="Ordenado">
-              <option value="bayer">Bayer</option>
-            </optgroup>
+            <option value="posterize">Posterize</option>
             <optgroup label="Difusión de Error">
               <option value="floyd-steinberg" selected>Floyd-Steinberg</option>
               <option value="atkinson">Atkinson</option>
-              <option value="jjn">Jarvis-Judice-Ninke</option>
               <option value="stucki">Stucki</option>
-              <option value="burkes">Burkes</option>
-              <option value="sierra-2">Sierra 2-row</option>
             </optgroup>
-            <optgroup label="Avanzados">
-              <option value="riemersma">Riemersma</option>
+            <optgroup label="Dithering Ordenado">
+              <option value="bayer">Bayer</option>
               <option value="blue-noise">Blue Noise</option>
+            </optgroup>
+            <optgroup label="Avanzado">
               <option value="variable-error">Variable Error</option>
             </optgroup>
           </select>
