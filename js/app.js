@@ -382,7 +382,22 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (isVideo) {
         const media = p.createVideo([currentFileURL], () => {
-          p.resizeCanvas(media.width, media.height);
+          // Limitar resolución a 2048px
+          const maxDim = 2048;
+          let w = media.width;
+          let h = media.height;
+          
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.floor(h * (maxDim / w));
+              w = maxDim;
+            } else {
+              w = Math.floor(w * (maxDim / h));
+              h = maxDim;
+            }
+          }
+          
+          p.resizeCanvas(w, h);
           appState.update({ media, isPlaying: false });
           media.volume(0);
           media.speed(appState.playbackSpeed);
@@ -391,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           ui.elements.mediaType.textContent = 'VIDEO';
           ui.elements.mediaType.className = 'bg-blue-600 px-2 py-1 rounded text-xs';
-          ui.elements.mediaDimensions.textContent = `${media.width}x${media.height} - ${formatTime(media.duration())}`;
+          ui.elements.mediaDimensions.textContent = `${w}x${h} - ${formatTime(media.duration())}`;
           
           ui.elements.timelinePanel.classList.remove('hidden');
           ui.elements.gifExportPanel.classList.remove('hidden');
@@ -405,7 +420,23 @@ document.addEventListener('DOMContentLoaded', () => {
         media.hide();
       } else {
         const media = p.loadImage(currentFileURL, () => {
-          p.resizeCanvas(media.width, media.height);
+          // Limitar resolución a 2048px
+          const maxDim = 2048;
+          let w = media.width;
+          let h = media.height;
+          
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.floor(h * (maxDim / w));
+              w = maxDim;
+            } else {
+              w = Math.floor(w * (maxDim / h));
+              h = maxDim;
+            }
+            media.resize(w, h);
+          }
+          
+          p.resizeCanvas(w, h);
           appState.update({ media });
           ui.elements.playBtn.textContent = 'N/A';
           ui.elements.playBtn.disabled = true;
@@ -413,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           ui.elements.mediaType.textContent = 'IMAGEN';
           ui.elements.mediaType.className = 'bg-purple-600 px-2 py-1 rounded text-xs';
-          ui.elements.mediaDimensions.textContent = `${media.width}x${media.height}`;
+          ui.elements.mediaDimensions.textContent = `${w}x${h}`;
           
           ui.elements.timelinePanel.classList.add('hidden');
           ui.elements.gifExportPanel.classList.add('hidden');
