@@ -298,18 +298,37 @@ function drawRiemersma(p, buffer, src, w, h, cfg, lumaLUT) {
   buffer.loadPixels();
   
   const pix = new Uint8ClampedArray(buffer.pixels);
-  const hilbertPath = generateHilbertPath(pw, ph);
   
-  let carryError = [0, 0, 0];
-  const decayFactor = 0.9;
+  // Crear curva de Hilbert simple (orden limitado para rendimiento)
+  const hilbertPath = generateSimpleHilbertPath(pw, ph);
+  
+  // Buffer de errores con historial (característica de Riemersma)
+  const errorBuffer = [];
+  const bufferSize = 16; // Tamaño del buffer de errores
+  let errorSum = [0, 0, 0];
+  
+  const decayWeights = Array.from({length: bufferSize}, (_, i) => 
+    Math.exp(-i * 0.25) // Decay exponencial
+  );
   
   for (const [x, y] of hilbertPath) {
     const i = (y * pw + x) * 4;
     
-    const oldR = Math.min(255, Math.max(0, pix[i] + carryError[0]));
-    const oldG = Math.min(255, Math.max(0, pix[i + 1] + carryError[1]));
-    const oldB = Math.min(255, Math.max(0, pix[i + 2] + carryError[2]));
+    // Calcular error promedio ponderado del buffer
+    const weightedError = [0, 0, 0];
+    for (let j = 0; j < errorBuffer.length; j++) {
+      const weight = decayWeights[j];
+      weightedError[0] += errorBuffer[j][0] * weight;
+      weightedError[1] += errorBuffer[j][1] * weight;
+      weightedError[2] += errorBuffer[j][2] * weight;
+    }
     
+    // Aplicar error
+    const oldR = Math.min(255, Math.max(0, pix[i] + weightedError[0] * cfg.diffusionStrength));
+    const oldG = Math.min(255, Math.max(0, pix[i + 1] + weightedError[1] * cfg.diffusionStrength));
+    const oldB = Math.min(255, Math.max(0, pix[i + 2] + weightedError[2] * cfg.diffusionStrength));
+    
+    // Cuantizar usando la paleta
     const luma = oldR * 0.299 + oldG * 0.587 + oldB * 0.114;
     const [newR, newG, newB] = lumaLUT.map(luma);
     
@@ -317,9 +336,18 @@ function drawRiemersma(p, buffer, src, w, h, cfg, lumaLUT) {
     pix[i + 1] = newG;
     pix[i + 2] = newB;
     
-    carryError[0] = (oldR - newR) * cfg.diffusionStrength * decayFactor;
-    carryError[1] = (oldG - newG) * cfg.diffusionStrength * decayFactor;
-    carryError[2] = (oldB - newB) * cfg.diffusionStrength * decayFactor;
+    // Calcular error actual
+    const currentError = [
+      oldR - newR,
+      oldG - newG,
+      oldB - newB
+    ];
+    
+    // Agregar al buffer (FIFO)
+    errorBuffer.unshift(currentError);
+    if (errorBuffer.length > bufferSize) {
+      errorBuffer.pop();
+    }
   }
   
   buffer.pixels.set(pix);
@@ -418,44 +446,69 @@ function drawVariableError(p, buffer, src, w, h, cfg, lumaLUT) {
 }
 
 // ============================================================================
-// UTILIDADES PARA HILBERT CURVE
+// UTILIDADES PARA HILBERT CURVE (SIMPLIFICADO)
 // ============================================================================
 
-function generateHilbertPath(w, h) {
+function generateSimpleHilbertPath(w, h) {
   const path = [];
-  const size = Math.min(w, h);
-  const order = Math.floor(Math.log2(size));
+  const maxSize = Math.max(w, h);
+  
+  // Si es muy grande, usar orden menor para rendimiento
+  const order = Math.min(Math.floor(Math.log2(maxSize)), 6);
   const n = Math.pow(2, order);
   
-  for (let i = 0; i < n * n; i++) {
-    const [x, y] = d2xy(n, i);
+  // Generar todos los puntos de la curva
+  const totalPoints = n * n;
+  
+  for (let d = 0; d < totalPoints; d++) {
+    const [x, y] = d2xy(n, d);
+    
+    // Solo agregar si está dentro de los límites reales
     if (x < w && y < h) {
       path.push([x, y]);
     }
   }
+  
+  // Si la curva no cubre toda el área, agregar el resto en orden raster
+  const visitedSet = new Set(path.map(([x, y]) => `${x},${y}`));
+  
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const key = `${x},${y}`;
+      if (!visitedSet.has(key)) {
+        path.push([x, y]);
+      }
+    }
+  }
+  
   return path;
 }
 
 function d2xy(n, d) {
   let x = 0, y = 0;
-  for (let s = 1; s < n; s *= 2) {
-    const rx = 1 & (d / 2);
+  let s = 1;
+  
+  while (s < n) {
+    const rx = 1 & Math.floor(d / 2);
     const ry = 1 & (d ^ rx);
-    [x, y] = rot(s, x, y, rx, ry);
+    
+    // Rotar/voltear cuadrante apropiadamente
+    if (ry === 0) {
+      if (rx === 1) {
+        x = s - 1 - x;
+        y = s - 1 - y;
+      }
+      // Swap x e y
+      const t = x;
+      x = y;
+      y = t;
+    }
+    
     x += s * rx;
     y += s * ry;
-    d /= 4;
+    d = Math.floor(d / 4);
+    s *= 2;
   }
-  return [x, y];
-}
-
-function rot(n, x, y, rx, ry) {
-  if (ry === 0) {
-    if (rx === 1) {
-      x = n - 1 - x;
-      y = n - 1 - y;
-    }
-    return [y, x];
-  }
+  
   return [x, y];
 }
