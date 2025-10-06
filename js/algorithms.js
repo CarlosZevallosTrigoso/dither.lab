@@ -5,22 +5,41 @@
 class BufferPool {
   constructor() {
     this.buffers = new Map();
+    this.lastUsed = new Map(); // OPTIMIZACIÓN: Tracking para cleanup
   }
   
   get(width, height, p) {
     const key = `${width}x${height}`;
+    this.lastUsed.set(key, Date.now());
+    
     if (!this.buffers.has(key)) {
       const buffer = p.createGraphics(width, height);
-      buffer.elt.getContext('2d', { willReadFrequently: true });
+      buffer.elt.getContext('2d', { 
+        willReadFrequently: true,
+        alpha: false // OPTIMIZACIÓN: Sin alpha si no se usa transparencia
+      });
       buffer.pixelDensity(1);
       this.buffers.set(key, buffer);
     }
     return this.buffers.get(key);
   }
   
+  // OPTIMIZACIÓN: Limpiar buffers viejos
+  cleanup(maxAge = 60000) {
+    const now = Date.now();
+    for (const [key, time] of this.lastUsed) {
+      if (now - time > maxAge) {
+        this.buffers.get(key)?.remove();
+        this.buffers.delete(key);
+        this.lastUsed.delete(key);
+      }
+    }
+  }
+  
   clear() {
     this.buffers.forEach(b => b.remove());
     this.buffers.clear();
+    this.lastUsed.clear();
   }
 }
 
@@ -123,7 +142,7 @@ class BlueNoiseLUT {
 }
 
 // ============================================================================
-// NUEVA FUNCIÓN PARA AJUSTES DE IMAGEN
+// FUNCIÓN PARA AJUSTES DE IMAGEN
 // ============================================================================
 function applyImageAdjustments(pixels, config) {
     const brightness = config.brightness;
@@ -162,7 +181,7 @@ function applyImageAdjustments(pixels, config) {
 }
 
 // ============================================================================
-// ALGORITMOS DE DITHERING (MODIFICADOS PARA USAR LOS AJUSTES)
+// ALGORITMOS DE DITHERING
 // ============================================================================
 
 function drawPosterize(p, buffer, src, w, h, cfg, lumaLUT) {
@@ -173,8 +192,9 @@ function drawPosterize(p, buffer, src, w, h, cfg, lumaLUT) {
   buffer.image(src, 0, 0, pw, ph);
   buffer.loadPixels();
   
-  const pixels = new Uint8ClampedArray(buffer.pixels);
-  applyImageAdjustments(pixels, cfg); // <-- APLICAR AJUSTES
+  // OPTIMIZACIÓN FASE 1: Operar directamente sobre buffer.pixels sin clonar
+  const pixels = buffer.pixels;
+  applyImageAdjustments(pixels, cfg);
   
   const len = pixels.length;
 
@@ -196,7 +216,6 @@ function drawPosterize(p, buffer, src, w, h, cfg, lumaLUT) {
     }
   }
   
-  buffer.pixels.set(pixels);
   buffer.updatePixels();
 }
 
@@ -208,8 +227,9 @@ function drawDither(p, buffer, src, w, h, cfg, lumaLUT, bayerLUT) {
   buffer.image(src, 0, 0, pw, ph);
   buffer.loadPixels();
   
-  const pix = new Uint8ClampedArray(buffer.pixels);
-  applyImageAdjustments(pix, cfg); // <-- APLICAR AJUSTES
+  // OPTIMIZACIÓN FASE 1: Operar directamente sobre buffer.pixels sin clonar
+  const pix = buffer.pixels;
+  applyImageAdjustments(pix, cfg);
 
   if (cfg.useOriginalColor) {
     const levels = 4;
@@ -327,7 +347,6 @@ function drawDither(p, buffer, src, w, h, cfg, lumaLUT, bayerLUT) {
     }
   }
   
-  buffer.pixels.set(pix);
   buffer.updatePixels();
 }
 
@@ -339,8 +358,9 @@ function drawBlueNoise(p, buffer, src, w, h, cfg, lumaLUT, blueNoiseLUT) {
   buffer.image(src, 0, 0, pw, ph);
   buffer.loadPixels();
   
-  const pix = new Uint8ClampedArray(buffer.pixels);
-  applyImageAdjustments(pix, cfg); // <-- APLICAR AJUSTES
+  // OPTIMIZACIÓN FASE 1: Operar directamente sobre buffer.pixels sin clonar
+  const pix = buffer.pixels;
+  applyImageAdjustments(pix, cfg);
 
   const levels = cfg.colorCount;
   const baseStrength = 255 / levels;
@@ -359,7 +379,6 @@ function drawBlueNoise(p, buffer, src, w, h, cfg, lumaLUT, blueNoiseLUT) {
     }
   }
   
-  buffer.pixels.set(pix);
   buffer.updatePixels();
 }
 
@@ -371,8 +390,9 @@ function drawVariableError(p, buffer, src, w, h, cfg, lumaLUT) {
   buffer.image(src, 0, 0, pw, ph);
   buffer.loadPixels();
   
-  const pix = new Uint8ClampedArray(buffer.pixels);
-  applyImageAdjustments(pix, cfg); // <-- APLICAR AJUSTES
+  // OPTIMIZACIÓN FASE 1: Operar directamente sobre buffer.pixels sin clonar
+  const pix = buffer.pixels;
+  applyImageAdjustments(pix, cfg);
 
   const kernel = KERNELS['floyd-steinberg'];
   
@@ -420,11 +440,5 @@ function drawVariableError(p, buffer, src, w, h, cfg, lumaLUT) {
     }
   }
   
-  buffer.pixels.set(pix);
   buffer.updatePixels();
 }
-
-// ============================================================================
-// UTILIDADES
-// ============================================================================
-// (Las funciones de Hilbert se han eliminado - Riemersma ahora usa patrón simplificado)
