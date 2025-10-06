@@ -41,8 +41,7 @@ class UIManager {
       'diffusionStrengthSlider', 'diffusionStrengthVal', 'patternStrengthSlider',
       'patternStrengthVal', 'recBtn', 'stopBtn', 'downloadImageBtn', 'status',
       'recIndicator', 'presetNameInput', 'savePresetBtn', 'presetSelect',
-      'deletePresetBtn', 'originalColorToggle', 'iconicPalettesContainer',
-      'togglePalettesBtn', 'shortcutsBtn', 'shortcutsModal', 'closeShortcutsBtn',
+      'deletePresetBtn', 'originalColorToggle', 'shortcutsBtn', 'shortcutsModal', 'closeShortcutsBtn',
       'mediaType', 'mediaDimensions', 'timelinePanel', 'timeline', 'timelineProgress',
       'timelineScrubber', 'timelineTime', 'markerIn', 'markerOut', 'setInBtn',
       'setOutBtn', 'clearMarkersBtn', 'loopSectionToggle', 'playbackSpeedSlider',
@@ -55,7 +54,6 @@ class UIManager {
       'exportSpriteBtn', 'exportSequenceBtn', 'infoText', 'errorDiffusionControls',
       'orderedDitherControls', 'fps', 'frameTime', 'effectName', 'timeDisplay',
       'speedDisplay',
-      // --- IDs DE NUEVOS CONTROLES AÑADIDOS AQUÍ ---
       'resetImageAdjustmentsBtn', 'brightnessSlider', 'brightnessVal',
       'contrastSlider', 'contrastVal', 'saturationSlider', 'saturationVal'
     ];
@@ -75,8 +73,8 @@ class UIManager {
         newColors.push("#" + grayVal.toString(16).padStart(2, "0").repeat(3));
       }
     } else if (colorCountChanged || forceGradient) {
-      const startColor = colorCache.getColor(previousColors[0] || "#0f380f");
-      const endColor = colorCache.getColor(previousColors[previousColors.length - 1] || "#9bbc0f");
+      const startColor = colorCache.getColor(previousColors[0] || "#000000");
+      const endColor = colorCache.getColor(previousColors[previousColors.length - 1] || "#FFFFFF");
       for (let i = 0; i < cfg.colorCount; i++) {
         const amount = cfg.colorCount === 1 ? 0 : i / (cfg.colorCount - 1);
         newColors.push(p.lerpColor(startColor, endColor, amount).toString("#rrggbb"));
@@ -134,47 +132,5 @@ class UIManager {
     }
     
     this.elements.infoText.textContent = ALGORITHM_INFO[effect] || "Selecciona un algoritmo.";
-  }
-  
-  createIconicPalettesUI(appState, colorCache, lumaLUT, p) {
-    const container = this.elements.iconicPalettesContainer;
-    container.innerHTML = '';
-    
-    for (const [key, palette] of Object.entries(ICONIC_PALETTES)) {
-      const paletteDiv = document.createElement('div');
-      paletteDiv.className = 'palette-option';
-      paletteDiv.innerHTML = `
-        <div class="flex justify-between items-center">
-          <div class="flex-1">
-            <div class="text-sm font-semibold text-gray-200">${palette.name}</div>
-            <div class="text-xs text-gray-400">${palette.description}</div>
-          </div>
-          <div class="text-xs text-gray-500">${palette.colors.length}</div>
-        </div>
-        <div class="palette-preview mt-2">
-          ${palette.colors.map(color => `<div class="palette-preview-color" style="background-color: ${color}"></div>`).join('')}
-        </div>
-      `;
-      
-      paletteDiv.addEventListener('click', () => {
-        appState.updateConfig({
-          colors: [...palette.colors],
-          colorCount: palette.colors.length,
-          isMonochrome: false
-        });
-        
-        this.elements.colorCountSlider.value = palette.colors.length;
-        this.elements.colorCountVal.textContent = palette.colors.length;
-        this.elements.monochromeToggle.checked = false;
-        
-        container.querySelectorAll('.palette-option').forEach(el => el.classList.remove('selected'));
-        paletteDiv.classList.add('selected');
-        
-        this.updateColorPickers(appState, colorCache, lumaLUT, p);
-        showToast(`Paleta "${palette.name}" aplicada`);
-      });
-      
-      container.appendChild(paletteDiv);
-    }
   }
 }
