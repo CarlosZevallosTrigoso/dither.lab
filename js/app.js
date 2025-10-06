@@ -100,7 +100,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     p.setup = () => {
       canvas = p.createCanvas(400, 225);
-      canvas.elt.getContext('2d', { willReadFrequently: true });
+      // FIX: Agregar willReadFrequently al contexto del canvas principal
+      canvas.elt.getContext('2d', { 
+        willReadFrequently: true,
+        alpha: false
+      });
       canvas.parent('canvasContainer');
       p.pixelDensity(1);
       p.textFont('monospace');
@@ -632,7 +636,29 @@ document.addEventListener('DOMContentLoaded', () => {
             else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
           }
           
-          p.resizeCanvas(w, h);
+          // FIX: Calcular el tamaño del canvas manteniendo aspect ratio
+          const container = document.getElementById('canvasContainer');
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+          const padding = 32;
+          
+          const availableWidth = containerWidth - padding;
+          const availableHeight = containerHeight - padding;
+          
+          const aspectRatio = w / h;
+          const containerAspect = availableWidth / availableHeight;
+          
+          let canvasW, canvasH;
+          
+          if (aspectRatio > containerAspect) {
+            canvasW = Math.min(w, availableWidth);
+            canvasH = canvasW / aspectRatio;
+          } else {
+            canvasH = Math.min(h, availableHeight);
+            canvasW = canvasH * aspectRatio;
+          }
+          
+          p.resizeCanvas(Math.floor(canvasW), Math.floor(canvasH));
           appState.update({ media, isPlaying: false });
 
           const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
@@ -646,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ui.elements.recBtn.disabled = false;
           ui.elements.mediaType.textContent = 'VIDEO';
           ui.elements.mediaType.className = 'bg-blue-600 px-2 py-1 rounded text-xs';
-          ui.elements.mediaDimensions.textContent = `${w}x${h} - ${formatTime(media.duration())}`;
+          ui.elements.mediaDimensions.textContent = `${media.width}x${media.height} - ${formatTime(media.duration())}`;
           ui.elements.timelinePanel.classList.remove('hidden');
           ui.elements.gifExportPanel.classList.remove('hidden');
           ui.elements.spriteSheetPanel.classList.remove('hidden');
@@ -654,13 +680,13 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTimelineUI = setupTimeline();
           ui.elements.status.textContent = 'Listo';
           
-          // OPTIMIZACIÓN FASE 1: Activar loop para video (mantiene actualizado el canvas)
           p.loop();
           
           showToast('Video cargado');
           triggerRedraw();
         });
         media.hide();
+        
       } else {
         const media = p.loadImage(currentFileURL, async () => {
           const maxDim = 2048;
@@ -673,7 +699,29 @@ document.addEventListener('DOMContentLoaded', () => {
             media.resize(w, h);
           }
           
-          p.resizeCanvas(w, h);
+          // FIX: Calcular el tamaño del canvas manteniendo aspect ratio
+          const container = document.getElementById('canvasContainer');
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+          const padding = 32;
+          
+          const availableWidth = containerWidth - padding;
+          const availableHeight = containerHeight - padding;
+          
+          const aspectRatio = w / h;
+          const containerAspect = availableWidth / availableHeight;
+          
+          let canvasW, canvasH;
+          
+          if (aspectRatio > containerAspect) {
+            canvasW = Math.min(w, availableWidth);
+            canvasH = canvasW / aspectRatio;
+          } else {
+            canvasH = Math.min(h, availableHeight);
+            canvasW = canvasH * aspectRatio;
+          }
+          
+          p.resizeCanvas(Math.floor(canvasW), Math.floor(canvasH));
           appState.update({ media });
 
           const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
@@ -692,7 +740,6 @@ document.addEventListener('DOMContentLoaded', () => {
           ui.elements.exportSequenceBtn.classList.add('hidden');
           ui.elements.status.textContent = 'Imagen cargada';
           
-          // OPTIMIZACIÓN FASE 1: Desactivar loop para imagen (ahorra CPU)
           p.noLoop();
           
           showToast('Imagen cargada');
@@ -1071,7 +1118,6 @@ document.addEventListener('DOMContentLoaded', () => {
       fpsHistory.push(fps);
       frameTimeHistory.push(p.deltaTime);
       
-      // OPTIMIZACIÓN FASE 1: CircularBuffer maneja el límite automáticamente
       const avgFps = fpsHistory.average();
       const avgFt = frameTimeHistory.average();
       
