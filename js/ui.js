@@ -54,7 +54,11 @@ class UIManager {
       'spriteColsSlider', 'spriteCols', 'spriteFrameCountSlider', 'spriteFrameCount',
       'exportSpriteBtn', 'exportSequenceBtn', 'infoText', 'errorDiffusionControls',
       'orderedDitherControls', 'fps', 'frameTime', 'effectName', 'timeDisplay',
-      'speedDisplay'];
+      'speedDisplay',
+      // --- IDs DE NUEVOS CONTROLES AÑADIDOS AQUÍ ---
+      'resetImageAdjustmentsBtn', 'brightnessSlider', 'brightnessVal',
+      'contrastSlider', 'contrastVal', 'saturationSlider', 'saturationVal'
+    ];
     
     ids.forEach(id => this.elements[id] = $(id));
   }
