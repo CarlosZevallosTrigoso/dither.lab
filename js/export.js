@@ -13,7 +13,7 @@ async function exportGifCore(p, media, config, startTime, endTime, fps, progress
       quality: parseInt(document.getElementById('gifQualitySlider').value),
       width: p.width,
       height: p.height,
-      workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
+      workerScript: 'js/gif.worker.js' // <-- ESTA LÍNEA HA SIDO MODIFICADA
     });
     
     gif.on('finished', blob => resolve(blob));
