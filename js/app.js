@@ -126,14 +126,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     p.draw = () => {
-      // OPTIMIZACIÓN FASE 1: Solo dibujar si hay cambios
-      if (!needsRedraw && appState.mediaType !== 'video') {
-        return;
-      }
-      
-      // Para video siempre necesitamos redibujar
-      if (appState.mediaType === 'video') {
-        needsRedraw = true;
+      // OPTIMIZACIÓN FASE 1: Lógica de lazy draw
+      // Para videos: siempre dibuja si está cargado (independiente de isPlaying)
+      // Para imágenes: solo dibuja cuando needsRedraw es true
+      if (appState.mediaType === 'image' && !needsRedraw) {
+        return; // Salir temprano para imágenes sin cambios
       }
       
       p.background(0);
@@ -183,8 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (updateTimelineUI && appState.mediaType === 'video') updateTimelineUI();
       updateFrameStats();
       
-      // OPTIMIZACIÓN FASE 1: Marcar que ya redibujamos (excepto para video en play)
-      if (appState.mediaType !== 'video' || !appState.isPlaying) {
+      // OPTIMIZACIÓN FASE 1: Solo marcar como no-redibujar para imágenes
+      if (appState.mediaType === 'image') {
         needsRedraw = false;
       }
     };
@@ -334,8 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.restartBtn.addEventListener("click", () => {
         if (appState.media && appState.mediaType === 'video') {
           appState.media.time(0);
+          // Forzar actualización inmediata
+          setTimeout(triggerRedraw, 50);
           showToast('Reiniciado');
-          triggerRedraw();
         }
       });
       
@@ -486,7 +484,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.update({ isPlaying: false });
         ui.elements.playBtn.textContent = 'Play';
         appState.media.time(Math.max(0, appState.media.time() - 1/30));
-        triggerRedraw();
+        // Forzar actualización inmediata
+        setTimeout(triggerRedraw, 50);
       });
       
       ui.elements.nextFrameBtn.addEventListener('click', () => {
@@ -495,7 +494,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.update({ isPlaying: false });
         ui.elements.playBtn.textContent = 'Play';
         appState.media.time(Math.min(appState.media.duration(), appState.media.time() + 1/30));
-        triggerRedraw();
+        // Forzar actualización inmediata
+        setTimeout(triggerRedraw, 50);
       });
       
       // Exportación
@@ -642,6 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
           media.volume(0);
           media.speed(appState.playbackSpeed);
           ui.elements.playBtn.textContent = 'Play';
+          ui.elements.playBtn.disabled = false;
           ui.elements.recBtn.disabled = false;
           ui.elements.mediaType.textContent = 'VIDEO';
           ui.elements.mediaType.className = 'bg-blue-600 px-2 py-1 rounded text-xs';
@@ -653,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTimelineUI = setupTimeline();
           ui.elements.status.textContent = 'Listo';
           
-          // OPTIMIZACIÓN FASE 1: Activar loop para video
+          // OPTIMIZACIÓN FASE 1: Activar loop para video (mantiene actualizado el canvas)
           p.loop();
           
           showToast('Video cargado');
@@ -691,6 +692,9 @@ document.addEventListener('DOMContentLoaded', () => {
           ui.elements.exportSequenceBtn.classList.add('hidden');
           ui.elements.status.textContent = 'Imagen cargada';
           
+          // OPTIMIZACIÓN FASE 1: Desactivar loop para imagen (ahorra CPU)
+          p.noLoop();
+          
           showToast('Imagen cargada');
           triggerRedraw();
         });
@@ -703,14 +707,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (appState.isPlaying) {
         appState.media.pause();
         ui.elements.playBtn.textContent = 'Play';
-        // OPTIMIZACIÓN FASE 1: Desactivar loop cuando se pausa
-        p.noLoop();
         showToast('Pausado');
       } else {
         appState.media.loop();
         ui.elements.playBtn.textContent = 'Pause';
-        // OPTIMIZACIÓN FASE 1: Reactivar loop cuando se reproduce
-        p.loop();
         showToast('Reproduciendo');
       }
       appState.update({ isPlaying: !appState.isPlaying });
