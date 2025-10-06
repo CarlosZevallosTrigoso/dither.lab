@@ -11,7 +11,7 @@ class BufferPool {
     const key = `${width}x${height}`;
     if (!this.buffers.has(key)) {
       const buffer = p.createGraphics(width, height);
-      buffer.elt.getContext('2d', { willReadFrequently: true }); // <-- LÍNEA MODIFICADA
+      buffer.elt.getContext('2d', { willReadFrequently: true });
       buffer.pixelDensity(1);
       this.buffers.set(key, buffer);
     }
@@ -123,7 +123,46 @@ class BlueNoiseLUT {
 }
 
 // ============================================================================
-// ALGORITMOS DE DITHERING
+// NUEVA FUNCIÓN PARA AJUSTES DE IMAGEN
+// ============================================================================
+function applyImageAdjustments(pixels, config) {
+    const brightness = config.brightness;
+    const contrast = config.contrast;
+    const saturation = config.saturation;
+
+    // No hacer nada si los valores son los por defecto para optimizar
+    if (brightness === 0 && contrast === 1.0 && saturation === 1.0) {
+        return;
+    }
+
+    const len = pixels.length;
+    for (let i = 0; i < len; i += 4) {
+        let r = pixels[i];
+        let g = pixels[i + 1];
+        let b = pixels[i + 2];
+
+        // 1. Contraste y Brillo
+        r = (r - 127.5) * contrast + 127.5 + brightness;
+        g = (g - 127.5) * contrast + 127.5 + brightness;
+        b = (b - 127.5) * contrast + 127.5 + brightness;
+
+        // 2. Saturación
+        if (saturation !== 1.0) {
+            const luma = r * 0.299 + g * 0.587 + b * 0.114;
+            r = luma + (r - luma) * saturation;
+            g = luma + (g - luma) * saturation;
+            b = luma + (b - luma) * saturation;
+        }
+        
+        // Asegurarse de que los valores permanezcan en el rango 0-255
+        pixels[i] = Math.max(0, Math.min(255, r));
+        pixels[i + 1] = Math.max(0, Math.min(255, g));
+        pixels[i + 2] = Math.max(0, Math.min(255, b));
+    }
+}
+
+// ============================================================================
+// ALGORITMOS DE DITHERING (MODIFICADOS PARA USAR LOS AJUSTES)
 // ============================================================================
 
 function drawPosterize(p, buffer, src, w, h, cfg, lumaLUT) {
@@ -135,6 +174,8 @@ function drawPosterize(p, buffer, src, w, h, cfg, lumaLUT) {
   buffer.loadPixels();
   
   const pixels = new Uint8ClampedArray(buffer.pixels);
+  applyImageAdjustments(pixels, cfg); // <-- APLICAR AJUSTES
+  
   const len = pixels.length;
 
   if (cfg.useOriginalColor) {
@@ -168,6 +209,7 @@ function drawDither(p, buffer, src, w, h, cfg, lumaLUT, bayerLUT) {
   buffer.loadPixels();
   
   const pix = new Uint8ClampedArray(buffer.pixels);
+  applyImageAdjustments(pix, cfg); // <-- APLICAR AJUSTES
 
   if (cfg.useOriginalColor) {
     const levels = 4;
@@ -289,8 +331,6 @@ function drawDither(p, buffer, src, w, h, cfg, lumaLUT, bayerLUT) {
   buffer.updatePixels();
 }
 
-// Algoritmo Riemersma (Space-filling curve) - Versión simplificada
-// Algoritmo Blue Noise
 function drawBlueNoise(p, buffer, src, w, h, cfg, lumaLUT, blueNoiseLUT) {
   const scale = cfg.ditherScale;
   const pw = Math.floor(w / scale);
@@ -300,6 +340,8 @@ function drawBlueNoise(p, buffer, src, w, h, cfg, lumaLUT, blueNoiseLUT) {
   buffer.loadPixels();
   
   const pix = new Uint8ClampedArray(buffer.pixels);
+  applyImageAdjustments(pix, cfg); // <-- APLICAR AJUSTES
+
   const levels = cfg.colorCount;
   const baseStrength = 255 / levels;
   const ditherStrength = baseStrength * cfg.patternStrength * 2;
@@ -321,7 +363,6 @@ function drawBlueNoise(p, buffer, src, w, h, cfg, lumaLUT, blueNoiseLUT) {
   buffer.updatePixels();
 }
 
-// Algoritmo Variable Error Diffusion
 function drawVariableError(p, buffer, src, w, h, cfg, lumaLUT) {
   const scale = cfg.ditherScale;
   const pw = Math.floor(w / scale);
@@ -331,6 +372,8 @@ function drawVariableError(p, buffer, src, w, h, cfg, lumaLUT) {
   buffer.loadPixels();
   
   const pix = new Uint8ClampedArray(buffer.pixels);
+  applyImageAdjustments(pix, cfg); // <-- APLICAR AJUSTES
+
   const kernel = KERNELS['floyd-steinberg'];
   
   // Calcular gradientes para detectar bordes
