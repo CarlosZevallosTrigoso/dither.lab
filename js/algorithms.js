@@ -11,6 +11,7 @@ class BufferPool {
     const key = `${width}x${height}`;
     if (!this.buffers.has(key)) {
       const buffer = p.createGraphics(width, height);
+      buffer.elt.getContext('2d', { willReadFrequently: true }); // <-- LÍNEA MODIFICADA
       buffer.pixelDensity(1);
       this.buffers.set(key, buffer);
     }
