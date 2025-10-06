@@ -13,7 +13,7 @@ const urlsToCache = [
   './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
+  './js/gif.worker.js' // <-- ESTA LÍNEA HA SIDO MODIFICADA
 ];
 
 self.addEventListener('install', event => {
