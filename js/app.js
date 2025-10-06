@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     p.setup = () => {
       canvas = p.createCanvas(400, 225);
+      canvas.elt.getContext('2d', { willReadFrequently: true }); // <-- LÍNEA MODIFICADA
       canvas.parent('canvasContainer');
       p.pixelDensity(1);
       p.textFont('monospace');
