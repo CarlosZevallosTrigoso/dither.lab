@@ -16,7 +16,11 @@ class AppState {
       ditherScale: 2,
       serpentineScan: false,
       diffusionStrength: 1,
-      patternStrength: 0.5
+      patternStrength: 0.5,
+      // --- NUEVAS PROPIEDADES AÑADIDAS ---
+      brightness: 0,    // Rango -100 a 100
+      contrast: 1.0,    // Rango 0.0 a 2.0 (se guarda como factor)
+      saturation: 1.0   // Rango 0.0 a 2.0 (se guarda como factor)
     };
     
     this.timeline = {
@@ -55,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     p.setup = () => {
       canvas = p.createCanvas(400, 225);
-      canvas.elt.getContext('2d', { willReadFrequently: true }); // <-- LÍNEA MODIFICADA
+      canvas.elt.getContext('2d', { willReadFrequently: true });
       canvas.parent('canvasContainer');
       p.pixelDensity(1);
       p.textFont('monospace');
@@ -173,6 +177,36 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.originalColorToggle.addEventListener("change", e => {
         appState.updateConfig({ useOriginalColor: e.target.checked });
         ui.togglePaletteControls(e.target.checked);
+      });
+
+      // --- NUEVOS EVENT LISTENERS PARA AJUSTES DE IMAGEN ---
+      ui.elements.brightnessSlider.addEventListener('input', e => {
+        const value = parseInt(e.target.value);
+        appState.updateConfig({ brightness: value });
+        ui.elements.brightnessVal.textContent = value;
+      });
+
+      ui.elements.contrastSlider.addEventListener('input', e => {
+        const value = parseInt(e.target.value);
+        appState.updateConfig({ contrast: value / 100 });
+        ui.elements.contrastVal.textContent = value;
+      });
+
+      ui.elements.saturationSlider.addEventListener('input', e => {
+        const value = parseInt(e.target.value);
+        appState.updateConfig({ saturation: value / 100 });
+        ui.elements.saturationVal.textContent = value;
+      });
+
+      ui.elements.resetImageAdjustmentsBtn.addEventListener('click', () => {
+        appState.updateConfig({ brightness: 0, contrast: 1.0, saturation: 1.0 });
+        ui.elements.brightnessSlider.value = 0;
+        ui.elements.contrastSlider.value = 100;
+        ui.elements.saturationSlider.value = 100;
+        ui.elements.brightnessVal.textContent = 0;
+        ui.elements.contrastVal.textContent = 100;
+        ui.elements.saturationVal.textContent = 100;
+        showToast('Ajustes de imagen reseteados');
       });
       
       ui.elements.ditherScale.addEventListener("input", e => {
@@ -799,6 +833,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.serpentineToggle.checked = cfg.serpentineScan;
       ui.elements.diffusionStrengthSlider.value = cfg.diffusionStrength * 100;
       ui.elements.patternStrengthSlider.value = cfg.patternStrength * 100;
+      
+      // --- ACTUALIZAR UI DE AJUSTES DE IMAGEN AL CARGAR PRESET ---
+      ui.elements.brightnessSlider.value = cfg.brightness || 0;
+      ui.elements.contrastSlider.value = (cfg.contrast || 1.0) * 100;
+      ui.elements.saturationSlider.value = (cfg.saturation || 1.0) * 100;
+      ui.elements.brightnessVal.textContent = cfg.brightness || 0;
+      ui.elements.contrastVal.textContent = (cfg.contrast || 1.0) * 100;
+      ui.elements.saturationVal.textContent = (cfg.saturation || 1.0) * 100;
+
       ui.elements.colorCountVal.textContent = cfg.colorCount;
       ui.elements.ditherScaleVal.textContent = cfg.ditherScale;
       ui.elements.diffusionStrengthVal.textContent = cfg.diffusionStrength * 100;
