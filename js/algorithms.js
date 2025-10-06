@@ -289,62 +289,6 @@ function drawDither(p, buffer, src, w, h, cfg, lumaLUT, bayerLUT) {
 }
 
 // Algoritmo Riemersma (Space-filling curve) - Versión simplificada
-// Algoritmo Riemersma - Simplificado a Floyd-Steinberg con serpentina
-function drawRiemersma(p, buffer, src, w, h, cfg, lumaLUT) {
-  const scale = cfg.ditherScale;
-  const pw = Math.floor(w / scale);
-  const ph = Math.floor(h / scale);
-  
-  buffer.image(src, 0, 0, pw, ph);
-  buffer.loadPixels();
-  
-  const pix = new Uint8ClampedArray(buffer.pixels);
-  const kernel = KERNELS['floyd-steinberg'];
-  const levels = cfg.colorCount;
-  const step = 255 / (levels > 1 ? levels - 1 : 1);
-  
-  for (let y = 0; y < ph; y++) {
-    const isReversed = y % 2 === 1; // Siempre serpentina
-    const xStart = isReversed ? pw - 1 : 0;
-    const xEnd = isReversed ? -1 : pw;
-    const xStep = isReversed ? -1 : 1;
-    
-    for (let x = xStart; x !== xEnd; x += xStep) {
-      const i = (y * pw + x) * 4;
-      const oldLuma = pix[i] * 0.299 + pix[i + 1] * 0.587 + pix[i + 2] * 0.114;
-      const newLuma = Math.round(oldLuma / step) * step;
-      const [r, g, b] = lumaLUT.map(newLuma);
-      
-      pix[i] = r;
-      pix[i + 1] = g;
-      pix[i + 2] = b;
-      
-      const err = (oldLuma - newLuma) * cfg.diffusionStrength;
-      const points = kernel.points;
-      const divisor = kernel.divisor;
-      
-      for (let j = 0; j < points.length; j++) {
-        const pt = points[j];
-        const dx = isReversed ? -pt.dx : pt.dx;
-        const nx = x + dx;
-        const ny = y + pt.dy;
-        
-        if (nx >= 0 && nx < pw && ny >= 0 && ny < ph) {
-          const ni = (ny * pw + nx) * 4;
-          const weight = pt.w / divisor;
-          const adjustment = err * weight;
-          pix[ni] = Math.min(255, Math.max(0, pix[ni] + adjustment));
-          pix[ni + 1] = Math.min(255, Math.max(0, pix[ni + 1] + adjustment));
-          pix[ni + 2] = Math.min(255, Math.max(0, pix[ni + 2] + adjustment));
-        }
-      }
-    }
-  }
-  
-  buffer.pixels.set(pix);
-  buffer.updatePixels();
-}
-
 // Algoritmo Blue Noise
 function drawBlueNoise(p, buffer, src, w, h, cfg, lumaLUT, blueNoiseLUT) {
   const scale = cfg.ditherScale;
