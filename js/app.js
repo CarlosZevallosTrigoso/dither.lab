@@ -12,15 +12,14 @@ class AppState {
       isMonochrome: false,
       useOriginalColor: false,
       colorCount: 4,
-      colors: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'],
+      colors: [], // Paleta inicial vacía, se generará desde el medio
       ditherScale: 2,
       serpentineScan: false,
       diffusionStrength: 1,
       patternStrength: 0.5,
-      // --- NUEVAS PROPIEDADES AÑADIDAS ---
-      brightness: 0,    // Rango -100 a 100
-      contrast: 1.0,    // Rango 0.0 a 2.0 (se guarda como factor)
-      saturation: 1.0   // Rango 0.0 a 2.0 (se guarda como factor)
+      brightness: 0,
+      contrast: 1.0,
+      saturation: 1.0
     };
     
     this.timeline = {
@@ -72,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       ui.init();
       initializeEventListeners();
-      ui.createIconicPalettesUI(appState, colorCache, lumaLUT, p);
+      // Se elimina la llamada a ui.createIconicPalettesUI()
       ui.updateColorPickers(appState, colorCache, lumaLUT, p);
       ui.updatePanelsVisibility(appState.config);
       updatePresetList();
@@ -126,6 +125,80 @@ document.addEventListener('DOMContentLoaded', () => {
       if (updateTimelineUI && appState.mediaType === 'video') updateTimelineUI();
       updateFrameStats();
     };
+
+    // --- NUEVA FUNCIÓN PARA GENERAR PALETA ---
+    async function generatePaletteFromMedia(media, colorCount) {
+        ui.elements.status.textContent = 'Analizando colores...';
+        showToast('Generando paleta desde el medio...');
+
+        // Usar un canvas temporal y pequeño para el análisis de rendimiento
+        const tempCanvas = p.createGraphics(100, 100);
+        tempCanvas.pixelDensity(1);
+
+        // Dibujar el primer frame del video o la imagen
+        if (appState.mediaType === 'video') {
+            media.pause();
+            media.time(0);
+            await new Promise(r => setTimeout(r, 200)); // Dar tiempo a que cargue el frame
+        }
+        tempCanvas.image(media, 0, 0, tempCanvas.width, tempCanvas.height);
+        tempCanvas.loadPixels();
+        
+        const pixels = [];
+        for (let i = 0; i < tempCanvas.pixels.length; i += 4) {
+            pixels.push([tempCanvas.pixels[i], tempCanvas.pixels[i+1], tempCanvas.pixels[i+2]]);
+        }
+
+        // --- Algoritmo K-Means para cuantización de color ---
+        const colorDist = (c1, c2) => Math.sqrt(Math.pow(c1[0]-c2[0], 2) + Math.pow(c1[1]-c2[1], 2) + Math.pow(c1[2]-c2[2], 2));
+        let centroids = pixels.slice(0, colorCount).map(p => [...p]); // Iniciar con los primeros N píxeles
+        const assignments = new Array(pixels.length);
+        
+        for (let iter = 0; iter < 10; iter++) { // Limitar iteraciones
+            // Asignar cada píxel al centroide más cercano
+            for (let i = 0; i < pixels.length; i++) {
+                let minDist = Infinity;
+                let bestCentroid = 0;
+                for (let j = 0; j < centroids.length; j++) {
+                    const dist = colorDist(pixels[i], centroids[j]);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestCentroid = j;
+                    }
+                }
+                assignments[i] = bestCentroid;
+            }
+
+            // Recalcular centroides
+            const newCentroids = new Array(colorCount).fill(0).map(() => [0,0,0]);
+            const counts = new Array(colorCount).fill(0);
+            for (let i = 0; i < pixels.length; i++) {
+                const centroidIndex = assignments[i];
+                newCentroids[centroidIndex][0] += pixels[i][0];
+                newCentroids[centroidIndex][1] += pixels[i][1];
+                newCentroids[centroidIndex][2] += pixels[i][2];
+                counts[centroidIndex]++;
+            }
+
+            for (let i = 0; i < centroids.length; i++) {
+                if (counts[i] > 0) {
+                    centroids[i] = [
+                        Math.round(newCentroids[i][0] / counts[i]),
+                        Math.round(newCentroids[i][1] / counts[i]),
+                        Math.round(newCentroids[i][2] / counts[i])
+                    ];
+                }
+            }
+        }
+        
+        tempCanvas.remove(); // Limpiar el canvas temporal
+        
+        // Ordenar colores por luminosidad y convertir a HEX
+        const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+        centroids.sort((a,b) => (a[0]*0.299 + a[1]*0.587 + a[2]*0.114) - (b[0]*0.299 + b[1]*0.587 + b[2]*0.114));
+
+        return centroids.map(toHex);
+    }
     
     function initializeEventListeners() {
       // Drag & Drop
@@ -179,7 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.togglePaletteControls(e.target.checked);
       });
 
-      // --- NUEVOS EVENT LISTENERS PARA AJUSTES DE IMAGEN ---
       ui.elements.brightnessSlider.addEventListener('input', e => {
         const value = parseInt(e.target.value);
         appState.updateConfig({ brightness: value });
@@ -381,13 +453,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       ui.elements.updateMetricsBtn.addEventListener('click', updateMetrics);
       
-      ui.elements.togglePalettesBtn.addEventListener('click', () => {
-        const isHidden = ui.elements.iconicPalettesContainer.classList.toggle('hidden');
-        ui.elements.togglePalettesBtn.textContent = isHidden ? '▼ Mostrar' : '▲ Ocultar';
-      });
+      // Se elimina el listener de togglePalettesBtn
     }
     
-    function handleFile(file) {
+    async function handleFile(file) {
       if (appState.media) {
         if (appState.mediaType === 'video') {
           appState.media.pause();
@@ -414,76 +483,70 @@ document.addEventListener('DOMContentLoaded', () => {
       appState.update({ mediaType: isVideo ? 'video' : 'image' });
       
       if (isVideo) {
-        const media = p.createVideo([currentFileURL], () => {
-          // Limitar resolución a 2048px
+        const media = p.createVideo([currentFileURL], async () => {
           const maxDim = 2048;
           let w = media.width;
           let h = media.height;
           
           if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.floor(h * (maxDim / w));
-              w = maxDim;
-            } else {
-              w = Math.floor(w * (maxDim / h));
-              h = maxDim;
-            }
+            if (w > h) { h = Math.floor(h * (maxDim / w)); w = maxDim; }
+            else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
           }
           
           p.resizeCanvas(w, h);
           appState.update({ media, isPlaying: false });
+
+          // --- GENERAR PALETA Y ACTUALIZAR UI ---
+          const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
+          appState.updateConfig({ colors: newPalette });
+          ui.updateColorPickers(appState, colorCache, lumaLUT, p);
+
           media.volume(0);
           media.speed(appState.playbackSpeed);
           ui.elements.playBtn.textContent = 'Play';
           ui.elements.recBtn.disabled = false;
-          
           ui.elements.mediaType.textContent = 'VIDEO';
           ui.elements.mediaType.className = 'bg-blue-600 px-2 py-1 rounded text-xs';
           ui.elements.mediaDimensions.textContent = `${w}x${h} - ${formatTime(media.duration())}`;
-          
           ui.elements.timelinePanel.classList.remove('hidden');
           ui.elements.gifExportPanel.classList.remove('hidden');
           ui.elements.spriteSheetPanel.classList.remove('hidden');
           ui.elements.exportSequenceBtn.classList.remove('hidden');
-          
           updateTimelineUI = setupTimeline();
           ui.elements.status.textContent = 'Listo';
           showToast('Video cargado');
         });
         media.hide();
       } else {
-        const media = p.loadImage(currentFileURL, () => {
-          // Limitar resolución a 2048px
+        const media = p.loadImage(currentFileURL, async () => {
           const maxDim = 2048;
           let w = media.width;
           let h = media.height;
           
           if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.floor(h * (maxDim / w));
-              w = maxDim;
-            } else {
-              w = Math.floor(w * (maxDim / h));
-              h = maxDim;
-            }
+            if (w > h) { h = Math.floor(h * (maxDim / w)); w = maxDim; }
+            else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
             media.resize(w, h);
           }
           
           p.resizeCanvas(w, h);
           appState.update({ media });
+
+          // --- GENERAR PALETA Y ACTUALIZAR UI ---
+          const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
+          appState.updateConfig({ colors: newPalette });
+          ui.updateColorPickers(appState, colorCache, lumaLUT, p);
+          
           ui.elements.playBtn.textContent = 'N/A';
           ui.elements.playBtn.disabled = true;
           ui.elements.recBtn.disabled = true;
-          
           ui.elements.mediaType.textContent = 'IMAGEN';
           ui.elements.mediaType.className = 'bg-purple-600 px-2 py-1 rounded text-xs';
           ui.elements.mediaDimensions.textContent = `${w}x${h}`;
-          
           ui.elements.timelinePanel.classList.add('hidden');
           ui.elements.gifExportPanel.classList.add('hidden');
           ui.elements.spriteSheetPanel.classList.add('hidden');
           ui.elements.exportSequenceBtn.classList.add('hidden');
-          
           ui.elements.status.textContent = 'Imagen cargada';
           showToast('Imagen cargada');
         });
@@ -834,7 +897,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.diffusionStrengthSlider.value = cfg.diffusionStrength * 100;
       ui.elements.patternStrengthSlider.value = cfg.patternStrength * 100;
       
-      // --- ACTUALIZAR UI DE AJUSTES DE IMAGEN AL CARGAR PRESET ---
       ui.elements.brightnessSlider.value = cfg.brightness || 0;
       ui.elements.contrastSlider.value = (cfg.contrast || 1.0) * 100;
       ui.elements.saturationSlider.value = (cfg.saturation || 1.0) * 100;
