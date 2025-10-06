@@ -23,14 +23,6 @@ const KERNELS = {
       {dx:0, dy:2, w:1}
     ]
   },
-  'jjn': {
-    divisor: 48, 
-    points: [
-      {dx:1, dy:0, w:7}, {dx:2, dy:0, w:5},
-      {dx:-2, dy:1, w:3}, {dx:-1, dy:1, w:5}, {dx:0, dy:1, w:7}, {dx:1, dy:1, w:5}, {dx:2, dy:1, w:3},
-      {dx:-2, dy:2, w:1}, {dx:-1, dy:2, w:3}, {dx:0, dy:2, w:5}, {dx:1, dy:2, w:3}, {dx:2, dy:2, w:1}
-    ]
-  },
   'stucki': {
     divisor: 42, 
     points: [
@@ -38,36 +30,18 @@ const KERNELS = {
       {dx:-2, dy:1, w:2}, {dx:-1, dy:1, w:4}, {dx:0, dy:1, w:8}, {dx:1, dy:1, w:4}, {dx:2, dy:1, w:2},
       {dx:-2, dy:2, w:1}, {dx:-1, dy:2, w:2}, {dx:0, dy:2, w:4}, {dx:1, dy:2, w:2}, {dx:2, dy:2, w:1}
     ]
-  },
-  'burkes': {
-    divisor: 32, 
-    points: [
-      {dx:1, dy:0, w:8}, {dx:2, dy:0, w:4},
-      {dx:-2, dy:1, w:2}, {dx:-1, dy:1, w:4}, {dx:0, dy:1, w:8}, {dx:1, dy:1, w:4}, {dx:2, dy:1, w:2}
-    ]
-  },
-  'sierra-2': {
-    divisor: 16, 
-    points: [
-      {dx:1, dy:0, w:4}, {dx:2, dy:0, w:3},
-      {dx:-2, dy:1, w:1}, {dx:-1, dy:1, w:2}, {dx:0, dy:1, w:3}, {dx:1, dy:1, w:2}, {dx:2, dy:1, w:1}
-    ]
   }
 };
 
 const ALGORITHM_INFO = {
   'none': "Muestra el medio original sin procesamiento.",
-  'posterize': "Reduce los colores sin tramado. Útil para ver el 'banding' de color.",
-  'bayer': 'Dithering ordenado que usa una matriz de umbrales fija. Produce un patrón geométrico característico y es extremadamente rápido.',
-  'floyd-steinberg': 'El algoritmo de difusión de error más popular. Distribuye el error de cuantización a los píxeles vecinos, creando un resultado orgánico y de alta calidad.',
-  'atkinson': "Desarrollado en Apple para las primeras Macintosh. Solo difunde parte del error, lo que resulta en una imagen con más contraste.",
-  'jjn': "Algoritmo de difusión complejo que distribuye el error a 12 píxeles vecinos. Produce un tramado más suave.",
-  'stucki': "Variación de JJN que ajusta los pesos de la distribución para producir un resultado más limpio y nítido.",
-  'burkes': "Algoritmo de difusión simplificado y rápido que ofrece un buen balance entre velocidad y calidad.",
-  'sierra-2': "Variante rápida de Jarvis (JJN) que distribuye el error en solo dos filas, manteniendo una buena calidad visual.",
-  'riemersma': "Algoritmo avanzado que sigue una curva de Hilbert (space-filling curve) para distribuir errores de manera más uniforme, reduciendo artefactos direccionales.",
-  'blue-noise': "Usa una textura de ruido azul pre-calculada para dithering ordenado de alta calidad. Produce patrones menos perceptibles que Bayer y es más agradable visualmente.",
-  'variable-error': "Híbrido que ajusta dinámicamente la fuerza de difusión según el contenido local de la imagen, preservando mejor bordes y detalles."
+  'posterize': "Reduce los colores sin tramado. Útil para ver el 'banding' de color puro.",
+  'floyd-steinberg': 'Algoritmo de difusión de error más popular. Balance perfecto entre velocidad y calidad. Distribuye el error a 4 píxeles vecinos.',
+  'atkinson': "Difusión parcial desarrollada en Apple. Solo distribuye 6/8 del error, creando imágenes con más contraste y brillo. Icónico del Mac clásico.",
+  'stucki': "Difusión compleja a 12 píxeles vecinos. Produce el tramado más suave y de mayor calidad, ideal para gradientes.",
+  'bayer': 'Dithering ordenado con matriz de umbrales fija. Produce un patrón geométrico característico. Extremadamente rápido, estética retro.',
+  'blue-noise': "Dithering ordenado de alta calidad usando ruido azul. Produce patrones menos perceptibles que Bayer, más agradable visualmente.",
+  'variable-error': "Algoritmo adaptativo que ajusta la difusión según el contenido local. Preserva mejor los bordes y detalles finos."
 };
 
 const ICONIC_PALETTES = {
@@ -145,15 +119,11 @@ const ICONIC_PALETTES = {
 
 const ALGORITHM_NAMES = {
   'none': "Ninguno", 
-  'posterize': "Cuantizar", 
-  'bayer': "Bayer",
+  'posterize': "Posterize", 
   'floyd-steinberg': "Floyd-Steinberg", 
   'atkinson': "Atkinson",
-  'jjn': "Jarvis-Judice-Ninke", 
   'stucki': "Stucki",
-  'burkes': "Burkes", 
-  'sierra-2': "Sierra 2-row",
-  'riemersma': "Riemersma", 
+  'bayer': "Bayer",
   'blue-noise': "Blue Noise",
   'variable-error': "Variable Error"
 };
