@@ -105,8 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (cfg.effect === 'posterize') {
           drawPosterize(p, buffer, appState.media, p.width, p.height, cfg, lumaLUT);
-        } else if (cfg.effect === 'riemersma') {
-          drawRiemersma(p, buffer, appState.media, p.width, p.height, cfg, lumaLUT);
         } else if (cfg.effect === 'blue-noise') {
           drawBlueNoise(p, buffer, appState.media, p.width, p.height, cfg, lumaLUT, blueNoiseLUT);
         } else if (cfg.effect === 'variable-error') {
