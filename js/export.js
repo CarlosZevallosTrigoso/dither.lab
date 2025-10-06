@@ -13,7 +13,7 @@ async function exportGifCore(p, media, config, startTime, endTime, fps, progress
       quality: parseInt(document.getElementById('gifQualitySlider').value),
       width: p.width,
       height: p.height,
-      workerScript: 'js/gif.worker.js' // <-- ESTA LÍNEA HA SIDO MODIFICADA
+      workerScript: 'js/gif.worker.js'
     });
     
     gif.on('finished', blob => resolve(blob));
@@ -36,10 +36,12 @@ async function exportGifCore(p, media, config, startTime, endTime, fps, progress
         p.redraw();
         await new Promise(r => setTimeout(r, 50));
         
-        // Capturar canvas - p.canvas ya es el elemento DOM en instance mode
-        const imageData = p.drawingContext.getImageData(0, 0, p.width, p.height);
-        
-        gif.addFrame(imageData, {delay: frameDelay});
+        // --- LÍNEAS MODIFICADAS ---
+        // En lugar de obtener los datos de la imagen manualmente,
+        // pasamos el canvas directamente a la librería.
+        // La opción 'copy: true' es importante para asegurar que se capture el frame actual.
+        gif.addFrame(p.canvas, { copy: true, delay: frameDelay });
+        // --- FIN DE LÍNEAS MODIFICADAS ---
         
         if (progressCallback) {
           progressCallback((i + 1) / frameCount * 0.5); // 50% durante captura
