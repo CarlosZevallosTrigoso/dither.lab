@@ -17,6 +17,9 @@ async function exportGifCore(p, media, config, startTime, endTime, fps, progress
     });
     
     gif.on('finished', blob => resolve(blob));
+    gif.on('progress', prog => {
+      if (progressCallback) progressCallback(prog);
+    });
     
     (async () => {
       const wasPlaying = media.elt && !media.elt.paused;
@@ -26,21 +29,28 @@ async function exportGifCore(p, media, config, startTime, endTime, fps, progress
         const time = startTime + (i / fps);
         media.time(time);
         
-        await new Promise(r => setTimeout(r, 100));
+        // Esperar a que el frame se cargue
         await new Promise(r => setTimeout(r, 50));
         
-        const ctx = p.canvas.elt.getContext('2d');
+        // Forzar redibujado en p5
+        p.redraw();
+        await new Promise(r => setTimeout(r, 50));
+        
+        // Capturar canvas
+        const canvas = p.canvas.elt;
+        const ctx = canvas.getContext('2d');
         const imageData = ctx.getImageData(0, 0, p.width, p.height);
+        
         gif.addFrame(imageData, {delay: frameDelay});
         
         if (progressCallback) {
-          progressCallback((i + 1) / frameCount);
+          progressCallback((i + 1) / frameCount * 0.5); // 50% durante captura
         }
       }
       
-      gif.render();
-      
       if (wasPlaying) media.loop();
+      
+      gif.render();
     })().catch(reject);
   });
 }
