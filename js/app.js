@@ -1,3 +1,34 @@
+// ============================================================================
+// OPTIMIZACIÓN FASE 1: Circular Buffer para historial de FPS
+// ============================================================================
+class CircularBuffer {
+  constructor(size) {
+    this.buffer = new Float32Array(size);
+    this.index = 0;
+    this.size = size;
+    this.filled = false;
+  }
+  
+  push(value) {
+    this.buffer[this.index] = value;
+    this.index = (this.index + 1) % this.size;
+    if (this.index === 0) this.filled = true;
+  }
+  
+  average() {
+    const count = this.filled ? this.size : this.index;
+    if (count === 0) return 0;
+    let sum = 0;
+    for (let i = 0; i < count; i++) sum += this.buffer[i];
+    return sum / count;
+  }
+  
+  clear() {
+    this.index = 0;
+    this.filled = false;
+  }
+}
+
 // Estado de la aplicación
 class AppState {
   constructor() {
@@ -12,7 +43,7 @@ class AppState {
       isMonochrome: false,
       useOriginalColor: false,
       colorCount: 4,
-      colors: [], // Paleta inicial vacía, se generará desde el medio
+      colors: [],
       ditherScale: 2,
       serpentineScan: false,
       diffusionStrength: 1,
@@ -46,6 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let canvas, currentFileURL = null, updateTimelineUI = null;
     let recorder, chunks = [], originalDitherScale, originalCanvasWidth, originalCanvasHeight;
     
+    // OPTIMIZACIÓN FASE 1: Flag para controlar redibujado
+    let needsRedraw = true;
+    
     const appState = new AppState();
     const bufferPool = new BufferPool();
     const colorCache = new ColorCache(p);
@@ -54,7 +88,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const blueNoiseLUT = new BlueNoiseLUT();
     const ui = new UIManager();
     
-    const fpsHistory = [], frameTimeHistory = [];
+    // OPTIMIZACIÓN FASE 1: Usar CircularBuffer en lugar de arrays
+    const fpsHistory = new CircularBuffer(30);
+    const frameTimeHistory = new CircularBuffer(30);
+    
+    // OPTIMIZACIÓN FASE 1: Función para activar redibujado
+    window.triggerRedraw = triggerRedraw = () => {
+      needsRedraw = true;
+      p.redraw();
+    };
     
     p.setup = () => {
       canvas = p.createCanvas(400, 225);
@@ -66,25 +108,41 @@ document.addEventListener('DOMContentLoaded', () => {
       p.textAlign(p.CENTER, p.CENTER);
       p.textSize(20);
       
+      // OPTIMIZACIÓN FASE 1: Desactivar loop automático
+      p.noLoop();
+      
       const p5colors = colorCache.getColors(appState.config.colors);
       lumaLUT.build(p5colors, p);
       
       ui.init();
       initializeEventListeners();
-      // Se elimina la llamada a ui.createIconicPalettesUI()
       ui.updateColorPickers(appState, colorCache, lumaLUT, p);
       ui.updatePanelsVisibility(appState.config);
       updatePresetList();
       setupKeyboardShortcuts();
+      
+      // Primera vez dibujar
+      triggerRedraw();
     };
     
     p.draw = () => {
+      // OPTIMIZACIÓN FASE 1: Solo dibujar si hay cambios
+      if (!needsRedraw && appState.mediaType !== 'video') {
+        return;
+      }
+      
+      // Para video siempre necesitamos redibujar
+      if (appState.mediaType === 'video') {
+        needsRedraw = true;
+      }
+      
       p.background(0);
       
       if (!appState.media) {
         p.fill(128);
         p.text('Arrastra un video o imagen\npara comenzar', p.width/2, p.height/2);
         updateFrameStats();
+        needsRedraw = false;
         return;
       }
       
@@ -124,22 +182,27 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (updateTimelineUI && appState.mediaType === 'video') updateTimelineUI();
       updateFrameStats();
+      
+      // OPTIMIZACIÓN FASE 1: Marcar que ya redibujamos (excepto para video en play)
+      if (appState.mediaType !== 'video' || !appState.isPlaying) {
+        needsRedraw = false;
+      }
     };
 
-    // --- NUEVA FUNCIÓN PARA GENERAR PALETA ---
+    // ============================================================================
+    // OPTIMIZACIÓN FASE 2: K-Means con Early Stopping
+    // ============================================================================
     async function generatePaletteFromMedia(media, colorCount) {
         ui.elements.status.textContent = 'Analizando colores...';
         showToast('Generando paleta desde el medio...');
 
-        // Usar un canvas temporal y pequeño para el análisis de rendimiento
         const tempCanvas = p.createGraphics(100, 100);
         tempCanvas.pixelDensity(1);
 
-        // Dibujar el primer frame del video o la imagen
         if (appState.mediaType === 'video') {
             media.pause();
             media.time(0);
-            await new Promise(r => setTimeout(r, 200)); // Dar tiempo a que cargue el frame
+            await new Promise(r => setTimeout(r, 200));
         }
         tempCanvas.image(media, 0, 0, tempCanvas.width, tempCanvas.height);
         tempCanvas.loadPixels();
@@ -149,13 +212,53 @@ document.addEventListener('DOMContentLoaded', () => {
             pixels.push([tempCanvas.pixels[i], tempCanvas.pixels[i+1], tempCanvas.pixels[i+2]]);
         }
 
-        // --- Algoritmo K-Means para cuantización de color ---
-        const colorDist = (c1, c2) => Math.sqrt(Math.pow(c1[0]-c2[0], 2) + Math.pow(c1[1]-c2[1], 2) + Math.pow(c1[2]-c2[2], 2));
-        let centroids = pixels.slice(0, colorCount).map(p => [...p]); // Iniciar con los primeros N píxeles
-        const assignments = new Array(pixels.length);
+        // K-Means con early stopping
+        const colorDist = (c1, c2) => {
+          const dr = c1[0] - c2[0];
+          const dg = c1[1] - c2[1];
+          const db = c1[2] - c2[2];
+          return Math.sqrt(dr * dr + dg * dg + db * db);
+        };
         
-        for (let iter = 0; iter < 10; iter++) { // Limitar iteraciones
-            // Asignar cada píxel al centroide más cercano
+        // OPTIMIZACIÓN FASE 2: Mejor inicialización usando K-means++
+        let centroids = [];
+        centroids.push([...pixels[Math.floor(Math.random() * pixels.length)]]);
+        
+        while (centroids.length < colorCount) {
+          const distances = pixels.map(p => {
+            let minDist = Infinity;
+            for (const c of centroids) {
+              minDist = Math.min(minDist, colorDist(p, c));
+            }
+            return minDist * minDist;
+          });
+          
+          const sumDist = distances.reduce((a, b) => a + b, 0);
+          let rand = Math.random() * sumDist;
+          
+          for (let i = 0; i < pixels.length; i++) {
+            rand -= distances[i];
+            if (rand <= 0) {
+              centroids.push([...pixels[i]]);
+              break;
+            }
+          }
+        }
+        
+        const assignments = new Array(pixels.length);
+        let previousCentroids = null;
+        
+        // OPTIMIZACIÓN FASE 2: Early stopping
+        const centroidsEqual = (a, b, threshold = 1) => {
+          return a.every((c, i) => 
+            Math.abs(c[0] - b[i][0]) < threshold &&
+            Math.abs(c[1] - b[i][1]) < threshold &&
+            Math.abs(c[2] - b[i][2]) < threshold
+          );
+        };
+        
+        for (let iter = 0; iter < 10; iter++) {
+            // Asignar píxeles
             for (let i = 0; i < pixels.length; i++) {
                 let minDist = Infinity;
                 let bestCentroid = 0;
@@ -172,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Recalcular centroides
             const newCentroids = new Array(colorCount).fill(0).map(() => [0,0,0]);
             const counts = new Array(colorCount).fill(0);
+            
             for (let i = 0; i < pixels.length; i++) {
                 const centroidIndex = assignments[i];
                 newCentroids[centroidIndex][0] += pixels[i][0];
@@ -189,11 +293,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     ];
                 }
             }
+            
+            // OPTIMIZACIÓN FASE 2: Early stopping cuando converge
+            if (previousCentroids && centroidsEqual(centroids, previousCentroids)) {
+                console.log(`K-Means convergió en ${iter + 1} iteraciones`);
+                break;
+            }
+            previousCentroids = centroids.map(c => [...c]);
         }
         
-        tempCanvas.remove(); // Limpiar el canvas temporal
+        tempCanvas.remove();
         
-        // Ordenar colores por luminosidad y convertir a HEX
+        // Ordenar por luminosidad
         const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
         centroids.sort((a,b) => (a[0]*0.299 + a[1]*0.587 + a[2]*0.114) - (b[0]*0.299 + b[1]*0.587 + b[2]*0.114));
 
@@ -224,22 +335,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (appState.media && appState.mediaType === 'video') {
           appState.media.time(0);
           showToast('Reiniciado');
+          triggerRedraw();
         }
       });
       
       ui.elements.effectSelect.addEventListener("change", e => {
         appState.updateConfig({ effect: e.target.value });
         ui.updatePanelsVisibility(appState.config);
+        triggerRedraw();
       });
       
       ui.elements.monochromeToggle.addEventListener("change", e => {
         appState.updateConfig({ isMonochrome: e.target.checked });
         ui.updateColorPickers(appState, colorCache, lumaLUT, p, true);
+        triggerRedraw();
       });
       
+      // OPTIMIZACIÓN FASE 2: Debounce para colorCount pero con feedback inmediato
       const debouncedColorCountChange = debounce((value) => {
         appState.updateConfig({ colorCount: parseInt(value) });
         ui.updateColorPickers(appState, colorCache, lumaLUT, p, true);
+        triggerRedraw();
       }, 100);
       
       ui.elements.colorCountSlider.addEventListener("input", e => {
@@ -250,25 +366,34 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.originalColorToggle.addEventListener("change", e => {
         appState.updateConfig({ useOriginalColor: e.target.checked });
         ui.togglePaletteControls(e.target.checked);
+        triggerRedraw();
       });
 
-      ui.elements.brightnessSlider.addEventListener('input', e => {
+      // OPTIMIZACIÓN FASE 2: Throttle para sliders de imagen con feedback inmediato
+      const brightnessHandler = throttle(e => {
         const value = parseInt(e.target.value);
         appState.updateConfig({ brightness: value });
         ui.elements.brightnessVal.textContent = value;
-      });
+        triggerRedraw();
+      }, 16); // ~60fps
 
-      ui.elements.contrastSlider.addEventListener('input', e => {
+      const contrastHandler = throttle(e => {
         const value = parseInt(e.target.value);
         appState.updateConfig({ contrast: value / 100 });
         ui.elements.contrastVal.textContent = value;
-      });
+        triggerRedraw();
+      }, 16);
 
-      ui.elements.saturationSlider.addEventListener('input', e => {
+      const saturationHandler = throttle(e => {
         const value = parseInt(e.target.value);
         appState.updateConfig({ saturation: value / 100 });
         ui.elements.saturationVal.textContent = value;
-      });
+        triggerRedraw();
+      }, 16);
+
+      ui.elements.brightnessSlider.addEventListener('input', brightnessHandler);
+      ui.elements.contrastSlider.addEventListener('input', contrastHandler);
+      ui.elements.saturationSlider.addEventListener('input', saturationHandler);
 
       ui.elements.resetImageAdjustmentsBtn.addEventListener('click', () => {
         appState.updateConfig({ brightness: 0, contrast: 1.0, saturation: 1.0 });
@@ -278,27 +403,41 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.elements.brightnessVal.textContent = 0;
         ui.elements.contrastVal.textContent = 100;
         ui.elements.saturationVal.textContent = 100;
+        triggerRedraw();
         showToast('Ajustes de imagen reseteados');
       });
       
-      ui.elements.ditherScale.addEventListener("input", e => {
+      // OPTIMIZACIÓN FASE 2: Throttle para ditherScale
+      const ditherScaleHandler = throttle(e => {
         appState.updateConfig({ ditherScale: parseInt(e.target.value) });
         ui.elements.ditherScaleVal.textContent = e.target.value;
-      });
+        triggerRedraw();
+      }, 16);
+      
+      ui.elements.ditherScale.addEventListener("input", ditherScaleHandler);
       
       ui.elements.serpentineToggle.addEventListener("change", e => {
         appState.updateConfig({ serpentineScan: e.target.checked });
+        triggerRedraw();
       });
       
-      ui.elements.diffusionStrengthSlider.addEventListener("input", e => {
+      // OPTIMIZACIÓN FASE 2: Throttle para diffusion strength
+      const diffusionHandler = throttle(e => {
         appState.updateConfig({ diffusionStrength: parseInt(e.target.value) / 100 });
         ui.elements.diffusionStrengthVal.textContent = e.target.value;
-      });
+        triggerRedraw();
+      }, 16);
       
-      ui.elements.patternStrengthSlider.addEventListener("input", e => {
+      ui.elements.diffusionStrengthSlider.addEventListener("input", diffusionHandler);
+      
+      // OPTIMIZACIÓN FASE 2: Throttle para pattern strength
+      const patternHandler = throttle(e => {
         appState.updateConfig({ patternStrength: parseInt(e.target.value) / 100 });
         ui.elements.patternStrengthVal.textContent = e.target.value;
-      });
+        triggerRedraw();
+      }, 16);
+      
+      ui.elements.patternStrengthSlider.addEventListener("input", patternHandler);
       
       // Timeline
       ui.elements.setInBtn.addEventListener('click', () => {
@@ -347,6 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.update({ isPlaying: false });
         ui.elements.playBtn.textContent = 'Play';
         appState.media.time(Math.max(0, appState.media.time() - 1/30));
+        triggerRedraw();
       });
       
       ui.elements.nextFrameBtn.addEventListener('click', () => {
@@ -355,6 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.update({ isPlaying: false });
         ui.elements.playBtn.textContent = 'Play';
         appState.media.time(Math.min(appState.media.duration(), appState.media.time() + 1/30));
+        triggerRedraw();
       });
       
       // Exportación
@@ -452,8 +593,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       ui.elements.updateMetricsBtn.addEventListener('click', updateMetrics);
-      
-      // Se elimina el listener de togglePalettesBtn
     }
     
     async function handleFile(file) {
@@ -496,7 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
           p.resizeCanvas(w, h);
           appState.update({ media, isPlaying: false });
 
-          // --- GENERAR PALETA Y ACTUALIZAR UI ---
           const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
           appState.updateConfig({ colors: newPalette });
           ui.updateColorPickers(appState, colorCache, lumaLUT, p);
@@ -514,7 +652,12 @@ document.addEventListener('DOMContentLoaded', () => {
           ui.elements.exportSequenceBtn.classList.remove('hidden');
           updateTimelineUI = setupTimeline();
           ui.elements.status.textContent = 'Listo';
+          
+          // OPTIMIZACIÓN FASE 1: Activar loop para video
+          p.loop();
+          
           showToast('Video cargado');
+          triggerRedraw();
         });
         media.hide();
       } else {
@@ -532,7 +675,6 @@ document.addEventListener('DOMContentLoaded', () => {
           p.resizeCanvas(w, h);
           appState.update({ media });
 
-          // --- GENERAR PALETA Y ACTUALIZAR UI ---
           const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
           appState.updateConfig({ colors: newPalette });
           ui.updateColorPickers(appState, colorCache, lumaLUT, p);
@@ -548,7 +690,9 @@ document.addEventListener('DOMContentLoaded', () => {
           ui.elements.spriteSheetPanel.classList.add('hidden');
           ui.elements.exportSequenceBtn.classList.add('hidden');
           ui.elements.status.textContent = 'Imagen cargada';
+          
           showToast('Imagen cargada');
+          triggerRedraw();
         });
       }
     }
@@ -559,10 +703,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (appState.isPlaying) {
         appState.media.pause();
         ui.elements.playBtn.textContent = 'Play';
+        // OPTIMIZACIÓN FASE 1: Desactivar loop cuando se pausa
+        p.noLoop();
         showToast('Pausado');
       } else {
         appState.media.loop();
         ui.elements.playBtn.textContent = 'Pause';
+        // OPTIMIZACIÓN FASE 1: Reactivar loop cuando se reproduce
+        p.loop();
         showToast('Reproduciendo');
       }
       appState.update({ isPlaying: !appState.isPlaying });
@@ -607,6 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.media.loop();
         appState.update({ isPlaying: true });
         ui.elements.playBtn.textContent = 'Pause';
+        p.loop();
       }
       
       appState.update({ isRecording: true });
@@ -777,6 +926,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const percent = x / rect.width;
         const time = percent * media.duration();
         media.time(time);
+        triggerRedraw();
         updateTimelineUI();
       }
       
@@ -912,6 +1062,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.updateColorPickers(appState, colorCache, lumaLUT, p);
       ui.updatePanelsVisibility(cfg);
       ui.togglePaletteControls(cfg.useOriginalColor);
+      triggerRedraw();
       showToast(`Preset "${name}" cargado`);
     }
     
@@ -920,16 +1071,12 @@ document.addEventListener('DOMContentLoaded', () => {
       fpsHistory.push(fps);
       frameTimeHistory.push(p.deltaTime);
       
-      if (fpsHistory.length > 30) {
-        fpsHistory.shift();
-        frameTimeHistory.shift();
-      }
+      // OPTIMIZACIÓN FASE 1: CircularBuffer maneja el límite automáticamente
+      const avgFps = fpsHistory.average();
+      const avgFt = frameTimeHistory.average();
       
-      const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
-      const avgFt = frameTimeHistory.reduce((a, b) => a + b, 0) / frameTimeHistory.length;
-      
-      ui.elements.fps.textContent = isNaN(avgFps) ? "--" : Math.round(avgFps);
-      ui.elements.frameTime.textContent = isNaN(avgFt) ? "--" : avgFt.toFixed(1);
+      ui.elements.fps.textContent = isNaN(avgFps) || avgFps === 0 ? "--" : Math.round(avgFps);
+      ui.elements.frameTime.textContent = isNaN(avgFt) || avgFt === 0 ? "--" : avgFt.toFixed(1);
       
       appState.updateMetrics({ processTime: avgFt });
       
@@ -948,6 +1095,11 @@ document.addEventListener('DOMContentLoaded', () => {
       
       ui.elements.effectName.textContent = ALGORITHM_NAMES[appState.config.effect] || "Desconocido";
     }
+    
+    // OPTIMIZACIÓN: Cleanup periódico del buffer pool
+    setInterval(() => {
+      bufferPool.cleanup(60000);
+    }, 60000);
   };
   
   new p5(sketch);
