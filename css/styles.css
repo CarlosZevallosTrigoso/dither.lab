@@ -1,0 +1,146 @@
+body { 
+  background: #111827; 
+  color: #e5e7eb; 
+  font-family: system-ui, sans-serif; 
+  overflow: hidden; 
+}
+
+canvas { 
+  display: block; 
+  image-rendering: pixelated; 
+  max-width: 100%; 
+  max-height: 100%; 
+  width: auto; 
+  height: auto; 
+}
+
+.sidebar-scroll::-webkit-scrollbar { width: 8px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: #1f2937; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+
+input:disabled, select:disabled { cursor: not-allowed; opacity: 0.6; }
+label:has(input:disabled) span { opacity: 0.6; }
+
+input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type=color]::-webkit-color-swatch { border: none; border-radius: 0.25rem; }
+input[type=color]:disabled { cursor: not-allowed; opacity: 0.5; }
+
+@keyframes pulse { 
+  0%, 100% { opacity: 1; } 
+  50% { opacity: 0.3; } 
+}
+.recording-indicator { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+/* Tooltips */
+.tooltip { position: relative; display: inline-block; }
+.tooltip .tooltiptext {
+  visibility: hidden; width: 200px; background-color: #1f2937; color: #e5e7eb;
+  text-align: center; border-radius: 6px; padding: 8px; position: absolute;
+  z-index: 1000; bottom: 125%; left: 50%; margin-left: -100px; opacity: 0;
+  transition: opacity 0.3s; font-size: 12px; border: 1px solid #374151;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+.tooltip .tooltiptext::after {
+  content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+  border-width: 5px; border-style: solid; 
+  border-color: #1f2937 transparent transparent transparent;
+}
+.tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+
+/* Palette Preview */
+.palette-preview { 
+  display: flex; gap: 2px; height: 20px; 
+  border-radius: 4px; overflow: hidden; margin-top: 4px; 
+}
+.palette-preview-color { flex: 1; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 20px; right: 20px; background: #1f2937; color: #e5e7eb;
+  padding: 12px 20px; border-radius: 8px; border: 1px solid #374151;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 1000; 
+  animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+  from { transform: translateX(400px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Modals */
+.shortcuts-modal, .metrics-modal {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; 
+  justify-content: center;
+}
+.shortcuts-content, .metrics-content {
+  background: #1f2937; padding: 24px; border-radius: 12px; max-width: 600px;
+  max-height: 80vh; overflow-y: auto; border: 1px solid #374151;
+}
+.shortcut-item {
+  display: flex; justify-content: space-between; padding: 8px 0; 
+  border-bottom: 1px solid #374151;
+}
+.shortcut-key {
+  background: #374151; padding: 4px 8px; border-radius: 4px;
+  font-family: monospace; font-weight: bold;
+}
+
+/* Palette Options */
+.palette-option {
+  cursor: pointer; padding: 8px; border-radius: 6px; 
+  transition: all 0.2s; border: 2px solid transparent;
+}
+.palette-option:hover { background: #374151; border-color: #06b6d4; }
+.palette-option.selected { border-color: #06b6d4; background: #374151; }
+
+/* Timeline */
+.timeline-container {
+  position: relative; width: 100%; height: 40px; background: #1f2937;
+  border-radius: 8px; cursor: pointer; overflow: hidden;
+}
+.timeline-progress {
+  position: absolute; top: 0; left: 0; height: 100%; 
+  background: #06b6d4; opacity: 0.3;
+}
+.timeline-marker {
+  position: absolute; top: 0; width: 3px; height: 100%; 
+  cursor: col-resize; z-index: 10;
+}
+.timeline-marker.in { background: #10b981; }
+.timeline-marker.out { background: #ef4444; }
+.timeline-scrubber {
+  position: absolute; top: 0; width: 2px; height: 100%; 
+  background: #f59e0b; z-index: 5; pointer-events: none;
+}
+.timeline-time {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 12px; font-weight: bold; pointer-events: none; z-index: 3;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  width: 100%; height: 8px; background: #374151; 
+  border-radius: 4px; overflow: hidden; margin-top: 8px;
+}
+.progress-bar {
+  height: 100%; background: linear-gradient(90deg, #06b6d4, #3b82f6); 
+  transition: width 0.3s;
+}
+
+/* Metrics */
+.metric-card {
+  background: #374151; padding: 12px; border-radius: 8px; margin-bottom: 12px;
+}
+.metric-value {
+  font-size: 24px; font-weight: bold; color: #06b6d4;
+}
+.metric-label {
+  font-size: 12px; color: #9ca3af; text-transform: uppercase;
+}
+
+/* PWA Badge */
+.pwa-badge {
+  display: inline-block; background: #10b981; color: white; 
+  padding: 2px 6px; border-radius: 4px; 
+  font-size: 10px; font-weight: bold; margin-left: 8px;
+}

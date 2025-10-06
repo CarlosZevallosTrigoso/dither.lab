@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>DitherLab v6 - Enhanced</title>
+  <meta name="description" content="Procesador avanzado de dithering con análisis de métricas y exportación multipformato"/>
+  <meta name="theme-color" content="#06b6d4"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+</head>
+<body>
+
+  <div class="flex flex-col lg:flex-row h-screen max-h-screen">
+      
+    <!-- SIDEBAR -->
+    <div class="w-full lg:w-96 flex-shrink-0 bg-slate-900 p-6 overflow-y-auto sidebar-scroll">
+      <div class="space-y-4">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h1 class="text-3xl font-bold text-cyan-400">DitherLab</h1>
+            <span class="pwa-badge" id="pwaBadge" style="display:none">PWA</span>
+          </div>
+          <button id="shortcutsBtn" class="text-xs bg-slate-800 px-3 py-1 rounded hover:bg-slate-700 border border-slate-700">
+            Atajos (?)
+          </button>
+        </div>
+        <div class="text-xs text-gray-500 -mt-2 mb-4">v6.0 - Enhanced Edition</div>
+        
+        <!-- MEDIA INPUT -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <h2 class="font-bold text-cyan-300 mb-3">MEDIO</h2>
+          <div class="tooltip w-full">
+            <label class="block w-full text-center py-4 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-400 hover:bg-slate-700 transition-colors" id="dropZone">
+              <span class="text-gray-400">Arrastra video o imagen aquí</span>
+              <input id="fileInput" type="file" accept="video/*,image/*" class="hidden"/>
+            </label>
+            <span class="tooltiptext">Soporta: MP4, WEBM, MOV, PNG, JPG, GIF</span>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button id="playBtn" class="flex-1 py-2 bg-blue-600 rounded hover:bg-blue-500 tooltip">
+              Play
+              <span class="tooltiptext">Reproducir/Pausar (ESPACIO)</span>
+            </button>
+            <button id="restartBtn" class="px-3 py-2 bg-slate-700 rounded hover:bg-slate-600 tooltip">
+              ↺
+              <span class="tooltiptext">Reiniciar</span>
+            </button>
+          </div>
+          <div id="mediaInfo" class="text-xs text-gray-400 mt-2 flex items-center gap-2">
+            <span id="mediaType" class="bg-slate-700 px-2 py-1 rounded">No cargado</span>
+            <span id="mediaDimensions"></span>
+          </div>
+        </div>
+
+        <!-- TIMELINE -->
+        <div id="timelinePanel" class="bg-slate-800 rounded-lg p-4 hidden">
+          <h2 class="font-bold text-yellow-300 mb-3">TIMELINE</h2>
+          <div class="timeline-container" id="timeline">
+            <div class="timeline-progress" id="timelineProgress"></div>
+            <div class="timeline-marker in" id="markerIn"></div>
+            <div class="timeline-marker out" id="markerOut"></div>
+            <div class="timeline-scrubber" id="timelineScrubber"></div>
+            <div class="timeline-time" id="timelineTime">00:00</div>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div class="flex gap-2 text-xs">
+              <button id="setInBtn" class="flex-1 bg-green-700 px-2 py-1 rounded hover:bg-green-600">[ Entrada</button>
+              <button id="setOutBtn" class="flex-1 bg-red-700 px-2 py-1 rounded hover:bg-red-600">Salida ]</button>
+              <button id="clearMarkersBtn" class="px-3 bg-slate-700 rounded hover:bg-slate-600">✕</button>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input id="loopSectionToggle" type="checkbox" class="w-4 h-4"/>
+              <span class="text-sm">Loop entre marcadores</span>
+            </label>
+          </div>
+          <div class="mt-3">
+            <label class="block">
+              <span class="text-sm">Velocidad: <span id="playbackSpeedVal">1.0</span>x</span>
+              <input id="playbackSpeedSlider" type="range" min="25" max="200" value="100" step="25" class="w-full"/>
+            </label>
+            <div class="flex gap-1 mt-2 text-xs">
+              <button class="speed-preset flex-1 bg-slate-700 px-2 py-1 rounded hover:bg-slate-600" data-speed="25">0.25x</button>
+              <button class="speed-preset flex-1 bg-slate-700 px-2 py-1 rounded hover:bg-slate-600" data-speed="50">0.5x</button>
+              <button class="speed-preset flex-1 bg-slate-700 px-2 py-1 rounded hover:bg-slate-600" data-speed="100">1x</button>
+              <button class="speed-preset flex-1 bg-slate-700 px-2 py-1 rounded hover:bg-slate-600" data-speed="150">1.5x</button>
+              <button class="speed-preset flex-1 bg-slate-700 px-2 py-1 rounded hover:bg-slate-600" data-speed="200">2x</button>
+            </div>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <button id="prevFrameBtn" class="flex-1 bg-slate-700 px-2 py-2 rounded hover:bg-slate-600">◄ Frame</button>
+            <button id="nextFrameBtn" class="flex-1 bg-slate-700 px-2 py-2 rounded hover:bg-slate-600">Frame ►</button>
+          </div>
+        </div>
+
+        <!-- PALETAS ICÓNICAS -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-pink-300">PALETAS ICÓNICAS</h2>
+            <button id="togglePalettesBtn" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
+              ▼ Mostrar
+            </button>
+          </div>
+          <div id="iconicPalettesContainer" class="space-y-2 hidden"></div>
+        </div>
+
+        <!-- ALGORITMO -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <h2 class="font-bold text-purple-300 mb-3">ALGORITMO DE DITHERING</h2>
+          <select id="effectSelect" class="w-full bg-slate-700 p-2 rounded text-white">
+            <option value="none">Sin efecto</option>
+            <option value="posterize">Cuantizar</option>
+            <optgroup label="Ordenado">
+              <option value="bayer">Bayer</option>
+            </optgroup>
+            <optgroup label="Difusión de Error">
+              <option value="floyd-steinberg" selected>Floyd-Steinberg</option>
+              <option value="atkinson">Atkinson</option>
+              <option value="jjn">Jarvis-Judice-Ninke</option>
+              <option value="stucki">Stucki</option>
+              <option value="burkes">Burkes</option>
+              <option value="sierra-2">Sierra 2-row</option>
+            </optgroup>
+            <optgroup label="Avanzados">
+              <option value="riemersma">Riemersma</option>
+              <option value="blue-noise">Blue Noise</option>
+              <option value="variable-error">Variable Error</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- INFO -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <h3 class="font-bold text-sky-300 mb-2">ACERCA DEL ALGORITMO</h3>
+          <p id="infoText" class="text-xs text-gray-300 leading-relaxed">...</p>
+        </div>
+        
+        <!-- PALETA -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <h3 class="font-bold text-teal-300 mb-3">PALETA DINÁMICA</h3>
+          <div class="space-y-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input id="originalColorToggle" type="checkbox" class="w-4 h-4"/>
+              <span class="text-sm">Aplicar a Color Original</span>
+            </label>
+            <hr class="border-slate-700"/>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input id="monochromeToggle" type="checkbox" class="w-4 h-4"/>
+              <span class="text-sm">Blanco y Negro</span>
+            </label>
+            <label class="block">
+              <span class="text-sm">Colores: <span id="colorCountVal">4</span></span>
+              <input id="colorCountSlider" type="range" min="2" max="8" value="4" class="w-full"/>
+            </label>
+          </div>
+          <div id="colorPickerContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4"></div>
+        </div>
+        
+        <!-- CONTROLES AVANZADOS -->
+        <div id="ditherControls" class="bg-slate-800 rounded-lg p-4 hidden">
+          <h3 class="font-bold text-green-300 mb-3">CONTROLES AVANZADOS</h3>
+          <label class="block mb-3">
+            <span class="text-sm">Escala: <span id="ditherScaleVal">2</span></span>
+            <input id="ditherScale" type="range" min="1" max="10" value="2" class="w-full"/>
+          </label>
+          <div id="errorDiffusionControls" class="space-y-3 hidden pt-3 border-t border-slate-700">
+             <label class="flex items-center gap-2 cursor-pointer">
+               <input id="serpentineToggle" type="checkbox" class="w-4 h-4"/>
+               <span class="text-sm">Escaneo en Serpentina</span>
+             </label>
+             <label class="block">
+               <span class="text-sm">Fuerza: <span id="diffusionStrengthVal">100</span>%</span>
+               <input id="diffusionStrengthSlider" type="range" min="0" max="150" value="100" class="w-full"/>
+             </label>
+          </div>
+          <div id="orderedDitherControls" class="space-y-3 hidden pt-3 border-t border-slate-700">
+             <label class="block">
+               <span class="text-sm">Fuerza del Patrón: <span id="patternStrengthVal">50</span>%</span>
+               <input id="patternStrengthSlider" type="range" min="0" max="100" value="50" class="w-full"/>
+             </label>
+          </div>
+        </div>
+        
+        <!-- PRESETS -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <h2 class="font-bold text-orange-300 mb-3">PRESETS</h2>
+          <div class="flex gap-2 mb-3">
+            <input id="presetNameInput" type="text" placeholder="Nombre" class="flex-grow bg-slate-700 p-2 rounded text-white text-sm">
+            <button id="savePresetBtn" class="px-3 py-2 bg-orange-600 rounded hover:bg-orange-500 text-sm">Guardar</button>
+          </div>
+          <div class="flex gap-2">
+            <select id="presetSelect" class="flex-grow bg-slate-700 p-2 rounded text-white text-sm">
+              <option value="">Cargar Preset...</option>
+            </select>
+            <button id="deletePresetBtn" class="px-3 py-2 bg-red-800 rounded hover:bg-red-700 text-sm">Borrar</button>
+          </div>
+        </div>
+
+        <!-- ESTADÍSTICAS -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-yellow-300">ESTADÍSTICAS</h2>
+            <button id="metricsBtn" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">Métricas</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-center">
+            <div class="bg-slate-700 rounded p-2">
+              <div class="text-xs text-gray-400">FPS</div>
+              <div id="fps" class="text-xl font-bold text-green-400">--</div>
+            </div>
+            <div class="bg-slate-700 rounded p-2">
+              <div class="text-xs text-gray-400">ms/frame</div>
+              <div id="frameTime" class="text-xl font-bold text-cyan-400">--</div>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-400">
+            <div>Algoritmo: <span id="effectName" class="text-cyan-300">Floyd-Steinberg</span></div>
+            <div>Progreso: <span id="timeDisplay">00:00 / 00:00</span></div>
+            <div id="speedDisplay" class="hidden">Velocidad: <span class="text-yellow-300">1.0x</span></div>
+          </div>
+        </div>
+
+        <!-- EXPORTAR -->
+        <div class="bg-slate-800 rounded-lg p-4">
+          <h2 class="font-bold text-red-300 mb-3 flex items-center gap-2">
+            EXPORTAR
+            <span id="recIndicator" class="hidden w-3 h-3 bg-red-500 rounded-full recording-indicator"></span>
+          </h2>
+          
+          <!-- Video WebM -->
+          <div class="mb-3">
+            <div class="text-xs text-gray-400 mb-2">Video WebM</div>
+            <div class="space-y-2 mb-2">
+              <label class="block">
+                <span class="text-xs">Calidad:</span>
+                <select id="recordQuality" class="w-full bg-slate-700 p-1 rounded text-white text-xs">
+                  <option value="1">Máxima (Scale 1)</option>
+                  <option value="2" selected>Alta (Scale 2)</option>
+                  <option value="3">Media (Scale 3)</option>
+                  <option value="4">Rápida (Scale 4)</option>
+                </select>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer text-xs">
+                <input id="webmUseMarkersToggle" type="checkbox" class="w-4 h-4" checked/>
+                <span>Usar marcadores</span>
+              </label>
+            </div>
+            <button id="recBtn" class="w-full py-2 bg-red-600 rounded hover:bg-red-500 mb-2" disabled>Grabar WebM</button>
+            <button id="stopBtn" class="w-full py-2 bg-gray-700 rounded hover:bg-gray-600 hidden">Detener</button>
+          </div>
+          
+          <!-- GIF -->
+          <div id="gifExportPanel" class="mb-3 pt-3 border-t border-slate-700 hidden">
+            <div class="text-xs text-gray-400 mb-2">GIF Animado</div>
+            <div class="space-y-2 mb-2">
+              <label class="block">
+                <span class="text-xs">FPS: <span id="gifFpsVal">10</span></span>
+                <input id="gifFpsSlider" type="range" min="5" max="30" value="10" class="w-full"/>
+              </label>
+              <label class="block">
+                <span class="text-xs">Calidad: <span id="gifQualityVal">10</span></span>
+                <input id="gifQualitySlider" type="range" min="1" max="20" value="10" class="w-full"/>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer text-xs">
+                <input id="gifUseMarkersToggle" type="checkbox" class="w-4 h-4" checked/>
+                <span>Usar marcadores</span>
+              </label>
+            </div>
+            <button id="exportGifBtn" class="w-full py-2 bg-purple-600 rounded hover:bg-purple-500">Exportar GIF</button>
+            <div id="gifProgress" class="hidden">
+              <div class="text-xs text-gray-400 mt-2">GIF: <span id="gifProgressText">0%</span></div>
+              <div class="progress-bar-container">
+                <div class="progress-bar" id="gifProgressBar" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Sprite Sheet -->
+          <div id="spriteSheetPanel" class="mb-3 pt-3 border-t border-slate-700 hidden">
+            <div class="text-xs text-gray-400 mb-2">Sprite Sheet</div>
+            <div class="space-y-2 mb-2">
+              <label class="block">
+                <span class="text-xs">Columnas: <span id="spriteCols">8</span></span>
+                <input id="spriteColsSlider" type="range" min="4" max="16" value="8" class="w-full"/>
+              </label>
+              <label class="block">
+                <span class="text-xs">Frames: <span id="spriteFrameCount">30</span></span>
+                <input id="spriteFrameCountSlider" type="range" min="10" max="100" value="30" class="w-full"/>
+              </label>
+            </div>
+            <button id="exportSpriteBtn" class="w-full py-2 bg-pink-600 rounded hover:bg-pink-500">Exportar Sprite</button>
+          </div>
+          
+          <!-- Frame Actual -->
+          <div class="pt-3 border-t border-slate-700">
+            <div class="text-xs text-gray-400 mb-2">Frame Actual</div>
+            <button id="downloadImageBtn" class="w-full py-2 bg-cyan-600 rounded hover:bg-cyan-500 mb-2">Exportar PNG</button>
+            <button id="exportSequenceBtn" class="w-full py-2 bg-teal-600 rounded hover:bg-teal-500 hidden">Secuencia PNG</button>
+          </div>
+          
+          <div id="status" class="text-xs text-gray-400 mt-3">Esperando...</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- CANVAS -->
+    <div id="canvasContainer" class="flex-1 min-w-0 min-h-0 bg-black flex items-center justify-center p-4"></div>
+  </div>
+
+  <!-- MODALS -->
+  <div id="shortcutsModal" class="shortcuts-modal">
+    <div class="shortcuts-content">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-cyan-400">Atajos de Teclado</h2>
+        <button id="closeShortcutsBtn" class="text-2xl hover:text-red-400">&times;</button>
+      </div>
+      <div class="space-y-2">
+        <div class="shortcut-item"><span>Play/Pause</span><span class="shortcut-key">ESPACIO</span></div>
+        <div class="shortcut-item"><span>Frame anterior</span><span class="shortcut-key">←</span></div>
+        <div class="shortcut-item"><span>Frame siguiente</span><span class="shortcut-key">→</span></div>
+        <div class="shortcut-item"><span>Marcar entrada</span><span class="shortcut-key">I</span></div>
+        <div class="shortcut-item"><span>Marcar salida</span><span class="shortcut-key">O</span></div>
+        <div class="shortcut-item"><span>Grabar</span><span class="shortcut-key">R</span></div>
+        <div class="shortcut-item"><span>Detener</span><span class="shortcut-key">S</span></div>
+        <div class="shortcut-item"><span>Exportar PNG</span><span class="shortcut-key">D</span></div>
+        <div class="shortcut-item"><span>Pantalla completa</span><span class="shortcut-key">F</span></div>
+        <div class="shortcut-item"><span>Métricas</span><span class="shortcut-key">M</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="metricsModal" class="metrics-modal">
+    <div class="metrics-content">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-cyan-400">Análisis de Métricas</h2>
+        <button id="closeMetricsBtn" class="text-2xl hover:text-red-400">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <div class="metric-card">
+          <div class="metric-label">PSNR</div>
+          <div class="metric-value" id="metricPSNR">-- dB</div>
+          <div class="text-xs text-gray-400 mt-2">>30dB = excelente</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">SSIM</div>
+          <div class="metric-value" id="metricSSIM">--</div>
+          <div class="text-xs text-gray-400 mt-2">0-1 (cercano a 1 = mejor)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Compresión</div>
+          <div class="metric-value" id="metricCompression">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Paleta</div>
+          <div class="metric-value" id="metricPaletteSize">-- colores</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Tiempo</div>
+          <div class="metric-value" id="metricProcessTime">-- ms</div>
+        </div>
+      </div>
+      <button id="updateMetricsBtn" class="w-full mt-4 py-2 bg-cyan-600 rounded hover:bg-cyan-500">
+        Actualizar Métricas
+      </button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/constants.js"></script>
+  <script src="js/algorithms.js"></script>
+  <script src="js/metrics.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>
