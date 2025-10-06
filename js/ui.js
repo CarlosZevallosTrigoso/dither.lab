@@ -27,10 +27,28 @@ function debounce(func, wait) {
   };
 }
 
+// OPTIMIZACIÓN FASE 2: Función throttle para feedback inmediato en sliders
+function throttle(func, limit) {
+  let inThrottle;
+  let lastResult;
+  return function(...args) {
+    if (!inThrottle) {
+      lastResult = func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+    return lastResult;
+  };
+}
+
+// OPTIMIZACIÓN FASE 1: Variable global para controlar redibujado
+let triggerRedraw = null;
+
 // Gestión de UI
 class UIManager {
   constructor() {
     this.elements = {};
+    this.lastColorCount = 0; // OPTIMIZACIÓN FASE 2: Cache para evitar recrear DOM
   }
   
   init() {
@@ -61,11 +79,12 @@ class UIManager {
     ids.forEach(id => this.elements[id] = $(id));
   }
   
+  // OPTIMIZACIÓN FASE 2: Memoización DOM - solo recrear cuando cambia el número de colores
   updateColorPickers(appState, colorCache, lumaLUT, p, forceGradient = false) {
     const cfg = appState.config;
     const previousColors = [...cfg.colors];
     const newColors = [];
-    const colorCountChanged = cfg.colorCount !== previousColors.length;
+    const colorCountChanged = cfg.colorCount !== this.lastColorCount;
 
     if (cfg.isMonochrome) {
       for (let i = 0; i < cfg.colorCount; i++) {
@@ -84,27 +103,50 @@ class UIManager {
     }
 
     appState.updateConfig({ colors: newColors.slice(0, cfg.colorCount) });
-    this.elements.colorPickerContainer.innerHTML = "";
     
-    cfg.colors.forEach((hexColor, i) => {
-      const label = document.createElement("label");
-      label.className = "block";
-      label.innerHTML = `
-        <span class="text-xs text-gray-400">Color ${i + 1}</span>
-        <input type="color" value="${hexColor}" class="w-full h-10 p-0 border-none rounded cursor-pointer"/>
-      `;
-      const colorInput = label.querySelector("input");
-      colorInput.addEventListener("input", e => {
-        if (!cfg.isMonochrome) {
-          const colors = [...cfg.colors];
-          colors[i] = e.target.value;
-          appState.updateConfig({ colors });
-          const p5colors = colorCache.getColors(colors);
-          lumaLUT.build(p5colors, p);
+    // OPTIMIZACIÓN FASE 2: Solo recrear DOM si cambió el número de colores
+    const container = this.elements.colorPickerContainer;
+    const currentInputs = container.querySelectorAll('input[type="color"]');
+    
+    if (colorCountChanged || currentInputs.length !== cfg.colorCount) {
+      // Recrear todo el DOM
+      container.innerHTML = "";
+      
+      cfg.colors.forEach((hexColor, i) => {
+        const label = document.createElement("label");
+        label.className = "block";
+        label.innerHTML = `
+          <span class="text-xs text-gray-400">Color ${i + 1}</span>
+          <input type="color" value="${hexColor}" 
+                 data-index="${i}"
+                 class="w-full h-10 p-0 border-none rounded cursor-pointer"/>
+        `;
+        
+        const colorInput = label.querySelector("input");
+        colorInput.addEventListener("input", e => {
+          if (!cfg.isMonochrome) {
+            const colors = [...cfg.colors];
+            colors[i] = e.target.value;
+            appState.updateConfig({ colors });
+            const p5colors = colorCache.getColors(colors);
+            lumaLUT.build(p5colors, p);
+            
+            // OPTIMIZACIÓN FASE 1: Trigger redraw
+            if (triggerRedraw) triggerRedraw();
+          }
+        });
+        container.appendChild(label);
+      });
+      
+      this.lastColorCount = cfg.colorCount;
+    } else {
+      // Solo actualizar valores existentes
+      currentInputs.forEach((input, i) => {
+        if (input.value.toLowerCase() !== cfg.colors[i].toLowerCase()) {
+          input.value = cfg.colors[i];
         }
       });
-      this.elements.colorPickerContainer.appendChild(label);
-    });
+    }
     
     const p5colors = colorCache.getColors(cfg.colors);
     lumaLUT.build(p5colors, p);
@@ -133,4 +175,9 @@ class UIManager {
     
     this.elements.infoText.textContent = ALGORITHM_INFO[effect] || "Selecciona un algoritmo.";
   }
+}
+
+// OPTIMIZACIÓN FASE 1: Exportar para uso global
+if (typeof window !== 'undefined') {
+  window.UIHelpers = { throttle, debounce, showToast, formatTime };
 }
