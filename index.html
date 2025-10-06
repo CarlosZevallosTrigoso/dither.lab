@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>DitherLab v6 - Enhanced</title>
+  <title>DitherLab v6</title>
   <meta name="description" content="Procesador avanzado de dithering con análisis de métricas y exportación multipformato"/>
   <meta name="theme-color" content="#06b6d4"/>
   <link rel="manifest" href="manifest.json"/>
@@ -20,7 +20,7 @@
       <div class="space-y-4">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h1 class="text-3xl font-bold text-cyan-400">DitherLab</h1>
+            <h1 class="text-3xl font-bold text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors" onclick="location.reload()" title="Recargar página">DitherLab</h1>
             <span class="pwa-badge" id="pwaBadge" style="display:none">PWA</span>
           </div>
           <button id="shortcutsBtn" class="text-xs bg-slate-800 px-3 py-1 rounded hover:bg-slate-700 border border-slate-700">
@@ -91,16 +91,6 @@
             <button id="prevFrameBtn" class="flex-1 bg-slate-700 px-2 py-2 rounded hover:bg-slate-600">◄ Frame</button>
             <button id="nextFrameBtn" class="flex-1 bg-slate-700 px-2 py-2 rounded hover:bg-slate-600">Frame ►</button>
           </div>
-        </div>
-
-        <div class="bg-slate-800 rounded-lg p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="font-bold text-pink-300">PALETAS ICÓNICAS</h2>
-            <button id="togglePalettesBtn" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
-              ▼ Mostrar
-            </button>
-          </div>
-          <div id="iconicPalettesContainer" class="space-y-2 hidden"></div>
         </div>
 
         <div class="bg-slate-800 rounded-lg p-4">
