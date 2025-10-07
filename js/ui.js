@@ -27,7 +27,7 @@ function debounce(func, wait) {
   };
 }
 
-// Función throttle para feedback inmediato en sliders
+// OPTIMIZACIÓN FASE 2: Función throttle para feedback inmediato en sliders
 function throttle(func, limit) {
   let inThrottle;
   let lastResult;
@@ -41,26 +41,23 @@ function throttle(func, limit) {
   };
 }
 
-// Variable global para controlar redibujado
+// OPTIMIZACIÓN FASE 1: Variable global para controlar redibujado
 let triggerRedraw = null;
 
 // Gestión de UI
 class UIManager {
   constructor() {
     this.elements = {};
-    this.lastColorCount = 0;
+    this.lastColorCount = 0; // OPTIMIZACIÓN FASE 2: Cache para evitar recrear DOM
   }
   
   init() {
-    // ⭐ MODIFICADO: Eliminadas referencias a controles que ya no existen
+    // Obtener todos los elementos
     const ids = ['dropZone', 'fileInput', 'playBtn', 'restartBtn', 'effectSelect',
       'monochromeToggle', 'colorCountSlider', 'colorCountVal', 'colorPickerContainer',
-      'ditherControls', // ⭐ Mantenido (es el contenedor)
-      // ❌ ELIMINADO: 'ditherScale', 'ditherScaleVal', 'serpentineToggle',
-      // ❌ ELIMINADO: 'diffusionStrengthSlider', 'diffusionStrengthVal',
-      // ❌ ELIMINADO: 'patternStrengthSlider', 'patternStrengthVal',
-      // ❌ ELIMINADO: 'errorDiffusionControls', 'orderedDitherControls',
-      'recBtn', 'stopBtn', 'downloadImageBtn', 'status',
+      'ditherControls', 'ditherScale', 'ditherScaleVal', 'serpentineToggle',
+      'diffusionStrengthSlider', 'diffusionStrengthVal', 'patternStrengthSlider',
+      'patternStrengthVal', 'recBtn', 'stopBtn', 'downloadImageBtn', 'status',
       'recIndicator', 'presetNameInput', 'savePresetBtn', 'presetSelect',
       'deletePresetBtn', 'originalColorToggle', 'shortcutsBtn', 'shortcutsModal', 'closeShortcutsBtn',
       'mediaType', 'mediaDimensions', 'timelinePanel', 'timeline', 'timelineProgress',
@@ -72,8 +69,9 @@ class UIManager {
       'gifProgressBar', 'webmUseMarkersToggle', 'recordQuality', 'metricsBtn',
       'metricsModal', 'closeMetricsBtn', 'updateMetricsBtn', 'spriteSheetPanel',
       'spriteColsSlider', 'spriteCols', 'spriteFrameCountSlider', 'spriteFrameCount',
-      'exportSpriteBtn', 'exportSequenceBtn', 'infoText',
-      'fps', 'frameTime', 'effectName', 'timeDisplay', 'speedDisplay',
+      'exportSpriteBtn', 'exportSequenceBtn', 'infoText', 'errorDiffusionControls',
+      'orderedDitherControls', 'fps', 'frameTime', 'effectName', 'timeDisplay',
+      'speedDisplay',
       'resetImageAdjustmentsBtn', 'brightnessSlider', 'brightnessVal',
       'contrastSlider', 'contrastVal', 'saturationSlider', 'saturationVal'
     ];
@@ -81,6 +79,7 @@ class UIManager {
     ids.forEach(id => this.elements[id] = $(id));
   }
   
+  // OPTIMIZACIÓN FASE 2: Memoización DOM - solo recrear cuando cambia el número de colores
   updateColorPickers(appState, colorCache, lumaLUT, p, forceGradient = false) {
     const cfg = appState.config;
     const previousColors = [...cfg.colors];
@@ -105,10 +104,12 @@ class UIManager {
 
     appState.updateConfig({ colors: newColors.slice(0, cfg.colorCount) });
     
+    // OPTIMIZACIÓN FASE 2: Solo recrear DOM si cambió el número de colores
     const container = this.elements.colorPickerContainer;
     const currentInputs = container.querySelectorAll('input[type="color"]');
     
     if (colorCountChanged || currentInputs.length !== cfg.colorCount) {
+      // Recrear todo el DOM
       container.innerHTML = "";
       
       cfg.colors.forEach((hexColor, i) => {
@@ -130,6 +131,7 @@ class UIManager {
             const p5colors = colorCache.getColors(colors);
             lumaLUT.build(p5colors, p);
             
+            // OPTIMIZACIÓN FASE 1: Trigger redraw
             if (triggerRedraw) triggerRedraw();
           }
         });
@@ -138,6 +140,7 @@ class UIManager {
       
       this.lastColorCount = cfg.colorCount;
     } else {
+      // Solo actualizar valores existentes
       currentInputs.forEach((input, i) => {
         if (input.value.toLowerCase() !== cfg.colors[i].toLowerCase()) {
           input.value = cfg.colors[i];
@@ -159,16 +162,17 @@ class UIManager {
   }
   
   updatePanelsVisibility(cfg) {
-    // ⭐ MODIFICADO: Simplificado - solo muestra/oculta el panel principal
     const effect = cfg.effect;
     const isDithering = effect !== "none" && effect !== "posterize";
-    
     this.elements.ditherControls.classList.toggle("hidden", !isDithering);
     
-    // ⭐ ELIMINADO: Ya no controlamos errorDiffusionControls ni orderedDitherControls
-    // Esos paneles ya no existen, ahora todo es dinámico
+    if (isDithering) {
+      const isErrorDiffusion = !!KERNELS[effect] || effect === 'riemersma' || effect === 'variable-error';
+      const isOrdered = effect === "bayer" || effect === "blue-noise";
+      this.elements.errorDiffusionControls.classList.toggle("hidden", !isErrorDiffusion);
+      this.elements.orderedDitherControls.classList.toggle("hidden", !isOrdered);
+    }
     
-    // Actualizar descripción del algoritmo
     this.elements.infoText.textContent = ALGORITHM_INFO[effect] || "Selecciona un algoritmo.";
   }
 }
@@ -213,6 +217,7 @@ class CurvesEditor {
     if (isX) {
       return Math.round((canvasCoord / this.width) * 255);
     } else {
+      // Y está invertido (0 arriba = 255, abajo = 0)
       return Math.round(((this.height - canvasCoord) / this.height) * 255);
     }
   }
@@ -230,6 +235,7 @@ class CurvesEditor {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    // Buscar punto cercano
     const points = this.curves[this.currentChannel];
     for (let i = 0; i < points.length; i++) {
       const px = this.valueToCanvas(points[i].x, true);
@@ -244,9 +250,11 @@ class CurvesEditor {
       }
     }
     
+    // Si no hay punto cercano, crear uno nuevo
     const valueX = this.canvasToValue(x, true);
     const valueY = this.canvasToValue(y, false);
     
+    // No permitir agregar en los extremos
     if (valueX > 0 && valueX < 255) {
       this.addPoint(this.currentChannel, valueX, valueY);
       this.selectedPoint = points.findIndex(p => p.x === valueX);
@@ -262,6 +270,7 @@ class CurvesEditor {
     const valueX = this.canvasToValue(x, true);
     const valueY = this.canvasToValue(y, false);
     
+    // Actualizar info
     const info = document.getElementById('curvePointInfo');
     if (info) {
       info.textContent = `In: ${valueX} → Out: ${valueY}`;
@@ -270,9 +279,12 @@ class CurvesEditor {
     if (this.isDragging && this.selectedPoint !== null) {
       const points = this.curves[this.currentChannel];
       
+      // No permitir mover los puntos extremos en X
       if (this.selectedPoint === 0 || this.selectedPoint === points.length - 1) {
+        // Solo permitir mover en Y
         points[this.selectedPoint].y = Math.max(0, Math.min(255, valueY));
       } else {
+        // Mover libremente pero limitar X entre puntos adyacentes
         const prevX = points[this.selectedPoint - 1].x;
         const nextX = points[this.selectedPoint + 1].x;
         points[this.selectedPoint].x = Math.max(prevX + 1, Math.min(nextX - 1, valueX));
@@ -281,6 +293,7 @@ class CurvesEditor {
       
       this.render();
       
+      // Trigger redraw si está disponible
       if (window.triggerRedraw) window.triggerRedraw();
     }
   }
@@ -293,6 +306,7 @@ class CurvesEditor {
     if (this.selectedPoint !== null) {
       const points = this.curves[this.currentChannel];
       
+      // No permitir eliminar puntos extremos
       if (this.selectedPoint !== 0 && this.selectedPoint !== points.length - 1) {
         points.splice(this.selectedPoint, 1);
         this.selectedPoint = null;
@@ -335,12 +349,15 @@ class CurvesEditor {
     const w = this.width;
     const h = this.height;
     
+    // Limpiar
     ctx.fillStyle = '#111827';
     ctx.fillRect(0, 0, w, h);
     
+    // Grid
     ctx.strokeStyle = '#374151';
     ctx.lineWidth = 1;
     
+    // Líneas verticales y horizontales cada 25%
     for (let i = 0; i <= 4; i++) {
       const pos = (i / 4) * w;
       ctx.beginPath();
@@ -354,6 +371,7 @@ class CurvesEditor {
       ctx.stroke();
     }
     
+    // Diagonal de referencia (línea recta sin modificar)
     ctx.strokeStyle = '#4b5563';
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 5]);
@@ -363,6 +381,7 @@ class CurvesEditor {
     ctx.stroke();
     ctx.setLineDash([]);
     
+    // Dibujar curva
     const points = this.curves[this.currentChannel];
     const channelColors = {
       rgb: '#06b6d4',
@@ -375,6 +394,7 @@ class CurvesEditor {
     ctx.lineWidth = 2;
     ctx.beginPath();
     
+    // Interpolar curva usando spline cúbico
     const lut = this.getLUT(this.currentChannel);
     for (let x = 0; x <= 255; x++) {
       const canvasX = this.valueToCanvas(x, true);
@@ -388,6 +408,7 @@ class CurvesEditor {
     }
     ctx.stroke();
     
+    // Dibujar puntos de control
     points.forEach((point, index) => {
       const px = this.valueToCanvas(point.x, true);
       const py = this.valueToCanvas(point.y, false);
@@ -403,10 +424,12 @@ class CurvesEditor {
     });
   }
   
+  // Generar LUT (Look-Up Table) de 256 valores usando interpolación spline
   getLUT(channel) {
     const points = this.curves[channel];
     const lut = new Uint8Array(256);
     
+    // Interpolación lineal simple entre puntos
     for (let i = 0; i < points.length - 1; i++) {
       const p1 = points[i];
       const p2 = points[i + 1];
@@ -421,6 +444,7 @@ class CurvesEditor {
     return lut;
   }
   
+  // Obtener todas las LUTs para aplicar
   getAllLUTs() {
     return {
       rgb: this.getLUT('rgb'),
@@ -431,7 +455,7 @@ class CurvesEditor {
   }
 }
 
-// Exportar para uso global
+// OPTIMIZACIÓN FASE 1: Exportar para uso global
 if (typeof window !== 'undefined') {
   window.UIHelpers = { throttle, debounce, showToast, formatTime };
   window.CurvesEditor = CurvesEditor;
