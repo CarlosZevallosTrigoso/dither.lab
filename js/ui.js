@@ -177,7 +177,286 @@ class UIManager {
   }
 }
 
+// ============================================================================
+// CURVES EDITOR
+// ============================================================================
+
+class CurvesEditor {
+  constructor(canvasId, width = 280, height = 280) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.width = width;
+    this.height = height;
+    
+    // Curvas para cada canal: array de puntos {x, y} donde x,y ∈ [0, 255]
+    this.curves = {
+      rgb: [{x: 0, y: 0}, {x: 255, y: 255}],
+      r: [{x: 0, y: 0}, {x: 255, y: 255}],
+      g: [{x: 0, y: 0}, {x: 255, y: 255}],
+      b: [{x: 0, y: 0}, {x: 255, y: 255}]
+    };
+    
+    this.currentChannel = 'rgb';
+    this.selectedPoint = null;
+    this.isDragging = false;
+    this.pointRadius = 6;
+    
+    this.setupEventListeners();
+    this.render();
+  }
+  
+  setupEventListeners() {
+    this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
+    this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
+    this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
+    this.canvas.addEventListener('dblclick', this.onDoubleClick.bind(this));
+    this.canvas.addEventListener('mouseleave', this.onMouseUp.bind(this));
+  }
+  
+  canvasToValue(canvasCoord, isX) {
+    if (isX) {
+      return Math.round((canvasCoord / this.width) * 255);
+    } else {
+      // Y está invertido (0 arriba = 255, abajo = 0)
+      return Math.round(((this.height - canvasCoord) / this.height) * 255);
+    }
+  }
+  
+  valueToCanvas(value, isX) {
+    if (isX) {
+      return (value / 255) * this.width;
+    } else {
+      return this.height - (value / 255) * this.height;
+    }
+  }
+  
+  onMouseDown(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Buscar punto cercano
+    const points = this.curves[this.currentChannel];
+    for (let i = 0; i < points.length; i++) {
+      const px = this.valueToCanvas(points[i].x, true);
+      const py = this.valueToCanvas(points[i].y, false);
+      const dist = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
+      
+      if (dist < this.pointRadius + 5) {
+        this.selectedPoint = i;
+        this.isDragging = true;
+        this.render();
+        return;
+      }
+    }
+    
+    // Si no hay punto cercano, crear uno nuevo
+    const valueX = this.canvasToValue(x, true);
+    const valueY = this.canvasToValue(y, false);
+    
+    // No permitir agregar en los extremos
+    if (valueX > 0 && valueX < 255) {
+      this.addPoint(this.currentChannel, valueX, valueY);
+      this.selectedPoint = points.findIndex(p => p.x === valueX);
+      this.isDragging = true;
+    }
+  }
+  
+  onMouseMove(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const valueX = this.canvasToValue(x, true);
+    const valueY = this.canvasToValue(y, false);
+    
+    // Actualizar info
+    const info = document.getElementById('curvePointInfo');
+    if (info) {
+      info.textContent = `In: ${valueX} → Out: ${valueY}`;
+    }
+    
+    if (this.isDragging && this.selectedPoint !== null) {
+      const points = this.curves[this.currentChannel];
+      
+      // No permitir mover los puntos extremos en X
+      if (this.selectedPoint === 0 || this.selectedPoint === points.length - 1) {
+        // Solo permitir mover en Y
+        points[this.selectedPoint].y = Math.max(0, Math.min(255, valueY));
+      } else {
+        // Mover libremente pero limitar X entre puntos adyacentes
+        const prevX = points[this.selectedPoint - 1].x;
+        const nextX = points[this.selectedPoint + 1].x;
+        points[this.selectedPoint].x = Math.max(prevX + 1, Math.min(nextX - 1, valueX));
+        points[this.selectedPoint].y = Math.max(0, Math.min(255, valueY));
+      }
+      
+      this.render();
+      
+      // Trigger redraw si está disponible
+      if (window.triggerRedraw) window.triggerRedraw();
+    }
+  }
+  
+  onMouseUp(e) {
+    this.isDragging = false;
+  }
+  
+  onDoubleClick(e) {
+    if (this.selectedPoint !== null) {
+      const points = this.curves[this.currentChannel];
+      
+      // No permitir eliminar puntos extremos
+      if (this.selectedPoint !== 0 && this.selectedPoint !== points.length - 1) {
+        points.splice(this.selectedPoint, 1);
+        this.selectedPoint = null;
+        this.render();
+        if (window.triggerRedraw) window.triggerRedraw();
+      }
+    }
+  }
+  
+  addPoint(channel, x, y) {
+    const points = this.curves[channel];
+    points.push({x: Math.round(x), y: Math.round(y)});
+    points.sort((a, b) => a.x - b.x);
+  }
+  
+  setChannel(channel) {
+    this.currentChannel = channel;
+    this.selectedPoint = null;
+    this.render();
+  }
+  
+  resetChannel(channel) {
+    this.curves[channel] = [{x: 0, y: 0}, {x: 255, y: 255}];
+    this.selectedPoint = null;
+    this.render();
+    if (window.triggerRedraw) window.triggerRedraw();
+  }
+  
+  resetAllChannels() {
+    for (const channel in this.curves) {
+      this.curves[channel] = [{x: 0, y: 0}, {x: 255, y: 255}];
+    }
+    this.selectedPoint = null;
+    this.render();
+    if (window.triggerRedraw) window.triggerRedraw();
+  }
+  
+  render() {
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    
+    // Limpiar
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Grid
+    ctx.strokeStyle = '#374151';
+    ctx.lineWidth = 1;
+    
+    // Líneas verticales y horizontales cada 25%
+    for (let i = 0; i <= 4; i++) {
+      const pos = (i / 4) * w;
+      ctx.beginPath();
+      ctx.moveTo(pos, 0);
+      ctx.lineTo(pos, h);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, pos);
+      ctx.lineTo(w, pos);
+      ctx.stroke();
+    }
+    
+    // Diagonal de referencia (línea recta sin modificar)
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(w, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Dibujar curva
+    const points = this.curves[this.currentChannel];
+    const channelColors = {
+      rgb: '#06b6d4',
+      r: '#ef4444',
+      g: '#10b981',
+      b: '#3b82f6'
+    };
+    
+    ctx.strokeStyle = channelColors[this.currentChannel];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    // Interpolar curva usando spline cúbico
+    const lut = this.getLUT(this.currentChannel);
+    for (let x = 0; x <= 255; x++) {
+      const canvasX = this.valueToCanvas(x, true);
+      const canvasY = this.valueToCanvas(lut[x], false);
+      
+      if (x === 0) {
+        ctx.moveTo(canvasX, canvasY);
+      } else {
+        ctx.lineTo(canvasX, canvasY);
+      }
+    }
+    ctx.stroke();
+    
+    // Dibujar puntos de control
+    points.forEach((point, index) => {
+      const px = this.valueToCanvas(point.x, true);
+      const py = this.valueToCanvas(point.y, false);
+      
+      ctx.fillStyle = index === this.selectedPoint ? '#f59e0b' : '#06b6d4';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      
+      ctx.beginPath();
+      ctx.arc(px, py, this.pointRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+  }
+  
+  // Generar LUT (Look-Up Table) de 256 valores usando interpolación spline
+  getLUT(channel) {
+    const points = this.curves[channel];
+    const lut = new Uint8Array(256);
+    
+    // Interpolación lineal simple entre puntos
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      
+      for (let x = p1.x; x <= p2.x; x++) {
+        const t = (x - p1.x) / (p2.x - p1.x);
+        const y = p1.y + t * (p2.y - p1.y);
+        lut[x] = Math.round(Math.max(0, Math.min(255, y)));
+      }
+    }
+    
+    return lut;
+  }
+  
+  // Obtener todas las LUTs para aplicar
+  getAllLUTs() {
+    return {
+      rgb: this.getLUT('rgb'),
+      r: this.getLUT('r'),
+      g: this.getLUT('g'),
+      b: this.getLUT('b')
+    };
+  }
+}
+
 // OPTIMIZACIÓN FASE 1: Exportar para uso global
 if (typeof window !== 'undefined') {
   window.UIHelpers = { throttle, debounce, showToast, formatTime };
+  window.CurvesEditor = CurvesEditor;
 }
