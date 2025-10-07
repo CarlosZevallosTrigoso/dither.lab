@@ -445,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       ui.elements.serpentineToggle.addEventListener("change", e => { appState.updateConfig({ serpentineScan: e.target.checked }); triggerRedraw(); });
       
-      // Timeline y resto de listeners...
+      // Timeline
       ui.elements.setInBtn.addEventListener('click', () => { if (appState.media && appState.mediaType === 'video') { appState.updateTimeline({ markerInTime: appState.media.time() }); showToast(`Entrada: ${formatTime(appState.timeline.markerInTime)}`); } });
       ui.elements.setOutBtn.addEventListener('click', () => { if (appState.media && appState.mediaType === 'video') { appState.updateTimeline({ markerOutTime: appState.media.time() }); showToast(`Salida: ${formatTime(appState.timeline.markerOutTime)}`); } });
       ui.elements.clearMarkersBtn.addEventListener('click', () => { appState.updateTimeline({ markerInTime: null, markerOutTime: null }); showToast('Marcadores limpiados'); });
@@ -454,6 +454,8 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.speed-preset').forEach(btn => { btn.addEventListener('click', () => { const speed = parseInt(btn.dataset.speed) / 100; ui.elements.playbackSpeedSlider.value = speed * 100; appState.update({ playbackSpeed: speed }); if (appState.media && appState.mediaType === 'video') appState.media.speed(speed); ui.elements.playbackSpeedVal.textContent = speed.toFixed(2); }); });
       ui.elements.prevFrameBtn.addEventListener('click', () => { if (!appState.media || appState.mediaType !== 'video') return; appState.media.pause(); appState.update({ isPlaying: false }); ui.elements.playBtn.textContent = 'Play'; appState.media.time(Math.max(0, appState.media.time() - 1/30)); setTimeout(triggerRedraw, 50); });
       ui.elements.nextFrameBtn.addEventListener('click', () => { if (!appState.media || appState.mediaType !== 'video') return; appState.media.pause(); appState.update({ isPlaying: false }); ui.elements.playBtn.textContent = 'Play'; appState.media.time(Math.min(appState.media.duration(), appState.media.time() + 1/30)); setTimeout(triggerRedraw, 50); });
+      
+      // Exportación
       ui.elements.recBtn.addEventListener("click", startRecording);
       ui.elements.stopBtn.addEventListener("click", stopRecording);
       ui.elements.downloadImageBtn.addEventListener("click", () => { if (appState.media) p.saveCanvas(canvas, `dithering_${appState.config.effect}_${Date.now()}`, 'png'); });
@@ -464,9 +466,13 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.spriteFrameCountSlider.addEventListener('input', e => { ui.elements.spriteFrameCount.textContent = e.target.value; });
       ui.elements.exportSpriteBtn.addEventListener('click', () => { if (appState.media && appState.mediaType === 'video') { const cols = parseInt(ui.elements.spriteColsSlider.value); const frameCount = parseInt(ui.elements.spriteFrameCountSlider.value); exportSpriteSheet(p, appState.media, cols, frameCount); } });
       ui.elements.exportSequenceBtn.addEventListener('click', () => { if (appState.media && appState.mediaType === 'video') { const startTime = appState.timeline.markerInTime || 0; const endTime = appState.timeline.markerOutTime || appState.media.duration(); exportPNGSequence(p, appState.media, startTime, endTime, 15); } });
+      
+      // Presets
       ui.elements.savePresetBtn.addEventListener("click", () => { const name = ui.elements.presetNameInput.value.trim(); if (name) { const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}"); presets[name] = { ...appState.config, curves: curvesEditor.curves }; localStorage.setItem("dither_presets", JSON.stringify(presets)); ui.elements.presetNameInput.value = ""; updatePresetList(); showToast(`Preset "${name}" guardado`); } });
       ui.elements.deletePresetBtn.addEventListener("click", () => { const name = ui.elements.presetSelect.value; if (name) { const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}"); delete presets[name]; localStorage.setItem("dither_presets", JSON.stringify(presets)); updatePresetList(); showToast(`Preset "${name}" eliminado`); } });
       ui.elements.presetSelect.addEventListener("change", e => { if (e.target.value) applyPreset(e.target.value); });
+      
+      // Modals
       ui.elements.shortcutsBtn.addEventListener('click', () => { ui.elements.shortcutsModal.style.display = 'flex'; });
       ui.elements.closeShortcutsBtn.addEventListener('click', () => { ui.elements.shortcutsModal.style.display = 'none'; });
       ui.elements.shortcutsModal.addEventListener('click', (e) => { if (e.target === ui.elements.shortcutsModal) ui.elements.shortcutsModal.style.display = 'none'; });
