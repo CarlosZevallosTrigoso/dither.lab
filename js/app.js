@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // ⭐ NUEVO: Renderizar controles específicos del algoritmo
       if (paramsManager) {
-      paramsManager.renderControls(e.target.value);
+      paramsManager.renderControls(appState.config.effect);
       }
 
       updatePresetList();
