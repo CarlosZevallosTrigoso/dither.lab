@@ -102,6 +102,11 @@
               <option value="floyd-steinberg" selected>Floyd-Steinberg</option>
               <option value="atkinson">Atkinson</option>
               <option value="stucki">Stucki</option>
+              <!-- NUEVOS ALGORITMOS -->
+              <option value="jarvis-judice-ninke">Jarvis-Judice-Ninke</option>
+              <option value="sierra">Sierra</option>
+              <option value="sierra-lite">Sierra Lite</option>
+              <option value="burkes">Burkes</option>
             </optgroup>
             <optgroup label="Dithering Ordenado">
               <option value="bayer">Bayer</option>
@@ -141,11 +146,18 @@
         <div class="bg-slate-800 rounded-lg p-4">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-bold text-yellow-300">AJUSTES DE IMAGEN</h3>
-            <button id="resetImageAdjustmentsBtn" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
-              Resetear
-            </button>
+            <div class="flex gap-2">
+              <button id="toggleCurvesBtn" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
+                📈 Curvas
+              </button>
+              <button id="resetImageAdjustmentsBtn" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
+                Resetear
+              </button>
+            </div>
           </div>
-          <div class="space-y-3">
+          
+          <!-- Controles básicos (existentes) -->
+          <div id="basicImageControls" class="space-y-3">
             <label class="block">
               <span class="text-sm">Brillo: <span id="brightnessVal">0</span></span>
               <input id="brightnessSlider" type="range" min="-100" max="100" value="0" class="w-full"/>
@@ -158,6 +170,34 @@
               <span class="text-sm">Saturación: <span id="saturationVal">100</span>%</span>
               <input id="saturationSlider" type="range" min="0" max="200" value="100" class="w-full"/>
             </label>
+          </div>
+          
+          <!-- Editor de Curvas (NUEVO) -->
+          <div id="curvesEditor" class="hidden space-y-3">
+            <div class="flex gap-2 mb-2">
+              <button class="curve-channel-btn flex-1 bg-slate-600 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="rgb">RGB</button>
+              <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="r">R</button>
+              <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="g">G</button>
+              <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="b">B</button>
+            </div>
+            
+            <div class="curves-canvas-container" style="position: relative; background: #1f2937; border-radius: 8px; padding: 8px;">
+              <canvas id="curvesCanvas" width="280" height="280" style="cursor: crosshair; display: block;"></canvas>
+              <div class="text-xs text-gray-500 mt-2 flex justify-between">
+                <span>Sombras</span>
+                <span id="curvePointInfo" class="text-cyan-400"></span>
+                <span>Luces</span>
+              </div>
+            </div>
+            
+            <div class="flex gap-2">
+              <button id="resetCurveBtn" class="flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-600">Resetear Curva</button>
+              <button id="resetAllCurvesBtn" class="flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-600">Resetear Todo</button>
+            </div>
+            
+            <div class="text-xs text-gray-400 mt-2">
+              💡 Click para agregar puntos, arrastra para mover, doble-click para eliminar
+            </div>
           </div>
         </div>
         
