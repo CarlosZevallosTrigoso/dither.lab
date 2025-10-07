@@ -312,6 +312,57 @@ document.addEventListener('DOMContentLoaded', () => {
         return centroids.map(toHex);
     }
     
+    // ============================================================================
+    // FIX DE REDIMENSIONAMIENTO: Nueva función calculateCanvasDimensions
+    // ============================================================================
+    function calculateCanvasDimensions(mediaWidth, mediaHeight) {
+      const container = document.getElementById('canvasContainer');
+      
+      // Asegurar que el container tenga dimensiones válidas
+      let containerWidth = container.clientWidth || window.innerWidth;
+      let containerHeight = container.clientHeight || window.innerHeight;
+      
+      // Validar que las dimensiones sean razonables
+      if (containerWidth < 100) containerWidth = 800;
+      if (containerHeight < 100) containerHeight = 600;
+      
+      // Padding más generoso para asegurar que la imagen se vea completa
+      const padding = 64;
+      const availableWidth = containerWidth - padding;
+      const availableHeight = containerHeight - padding;
+      
+      // Validar dimensiones disponibles
+      if (availableWidth <= 0 || availableHeight <= 0) {
+        console.warn('Dimensiones de contenedor inválidas, usando valores por defecto');
+        return { width: 400, height: 225 };
+      }
+      
+      // Calcular aspect ratios
+      const mediaAspect = mediaWidth / mediaHeight;
+      const containerAspect = availableWidth / availableHeight;
+      
+      let canvasW, canvasH;
+      
+      // Determinar cómo escalar basándose en qué dimensión es limitante
+      if (mediaAspect > containerAspect) {
+        // La imagen es más ancha proporcionalmente -> limitar por ancho
+        canvasW = Math.min(mediaWidth, availableWidth);
+        canvasH = canvasW / mediaAspect;
+      } else {
+        // La imagen es más alta proporcionalmente -> limitar por alto
+        canvasH = Math.min(mediaHeight, availableHeight);
+        canvasW = canvasH * mediaAspect;
+      }
+      
+      // Asegurar que las dimensiones finales sean válidas y enteras
+      canvasW = Math.max(100, Math.floor(canvasW));
+      canvasH = Math.max(100, Math.floor(canvasH));
+      
+      console.log(`📐 Canvas dimensions: ${canvasW}x${canvasH} (media: ${mediaWidth}x${mediaHeight}, container: ${containerWidth}x${containerHeight})`);
+      
+      return { width: canvasW, height: canvasH };
+    }
+    
     function initializeEventListeners() {
       // Drag & Drop
       document.body.addEventListener("dragover", e => {
@@ -631,34 +682,21 @@ document.addEventListener('DOMContentLoaded', () => {
           let w = media.width;
           let h = media.height;
           
+          // Redimensionar el video si excede maxDim
           if (w > maxDim || h > maxDim) {
-            if (w > h) { h = Math.floor(h * (maxDim / w)); w = maxDim; }
-            else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
+            if (w > h) { 
+              h = Math.floor(h * (maxDim / w)); 
+              w = maxDim; 
+            } else { 
+              w = Math.floor(w * (maxDim / h)); 
+              h = maxDim; 
+            }
           }
           
-          // FIX: Calcular el tamaño del canvas manteniendo aspect ratio
-          const container = document.getElementById('canvasContainer');
-          const containerWidth = container.clientWidth;
-          const containerHeight = container.clientHeight;
-          const padding = 32;
+          // ✅ FIX: Usar nueva función de cálculo
+          const { width: canvasW, height: canvasH } = calculateCanvasDimensions(w, h);
+          p.resizeCanvas(canvasW, canvasH);
           
-          const availableWidth = containerWidth - padding;
-          const availableHeight = containerHeight - padding;
-          
-          const aspectRatio = w / h;
-          const containerAspect = availableWidth / availableHeight;
-          
-          let canvasW, canvasH;
-          
-          if (aspectRatio > containerAspect) {
-            canvasW = Math.min(w, availableWidth);
-            canvasH = canvasW / aspectRatio;
-          } else {
-            canvasH = Math.min(h, availableHeight);
-            canvasW = canvasH * aspectRatio;
-          }
-          
-          p.resizeCanvas(Math.floor(canvasW), Math.floor(canvasH));
           appState.update({ media, isPlaying: false });
 
           const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
@@ -693,35 +731,22 @@ document.addEventListener('DOMContentLoaded', () => {
           let w = media.width;
           let h = media.height;
           
+          // Redimensionar la imagen si excede maxDim
           if (w > maxDim || h > maxDim) {
-            if (w > h) { h = Math.floor(h * (maxDim / w)); w = maxDim; }
-            else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
+            if (w > h) { 
+              h = Math.floor(h * (maxDim / w)); 
+              w = maxDim; 
+            } else { 
+              w = Math.floor(w * (maxDim / h)); 
+              h = maxDim; 
+            }
             media.resize(w, h);
           }
           
-          // FIX: Calcular el tamaño del canvas manteniendo aspect ratio
-          const container = document.getElementById('canvasContainer');
-          const containerWidth = container.clientWidth;
-          const containerHeight = container.clientHeight;
-          const padding = 32;
+          // ✅ FIX: Usar nueva función de cálculo
+          const { width: canvasW, height: canvasH } = calculateCanvasDimensions(w, h);
+          p.resizeCanvas(canvasW, canvasH);
           
-          const availableWidth = containerWidth - padding;
-          const availableHeight = containerHeight - padding;
-          
-          const aspectRatio = w / h;
-          const containerAspect = availableWidth / availableHeight;
-          
-          let canvasW, canvasH;
-          
-          if (aspectRatio > containerAspect) {
-            canvasW = Math.min(w, availableWidth);
-            canvasH = canvasW / aspectRatio;
-          } else {
-            canvasH = Math.min(h, availableHeight);
-            canvasW = canvasH * aspectRatio;
-          }
-          
-          p.resizeCanvas(Math.floor(canvasW), Math.floor(canvasH));
           appState.update({ media });
 
           const newPalette = await generatePaletteFromMedia(media, appState.config.colorCount);
