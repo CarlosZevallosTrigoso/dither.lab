@@ -31,6 +31,8 @@ const KERNELS = {
       {dx:-2, dy:2, w:1}, {dx:-1, dy:2, w:2}, {dx:0, dy:2, w:4}, {dx:1, dy:2, w:2}, {dx:2, dy:2, w:1}
     ]
   },
+  
+  // ============== NUEVOS ALGORITMOS ==============
   'jarvis-judice-ninke': {
     divisor: 48,
     points: [
@@ -96,6 +98,8 @@ const ALGORITHM_INFO = {
   'bayer': 'Dithering ordenado con matriz de umbrales fija. Produce un patrón geométrico característico. Extremadamente rápido, estética retro.',
   'blue-noise': "Dithering ordenado de alta calidad usando ruido azul. Produce patrones menos perceptibles que Bayer, más agradable visualmente.",
   'variable-error': "Algoritmo adaptativo que ajusta la difusión según el contenido local. Preserva mejor los bordes y detalles finos.",
+  
+  // ============== NUEVOS ALGORITMOS ==============
   'jarvis-judice-ninke': "Difusión de error a 12 píxeles. Mayor área de difusión que Floyd-Steinberg, produce resultados muy suaves con menos artefactos.",
   'sierra': "Variante de difusión de error con 10 píxeles. Balance entre Stucki y Floyd-Steinberg. Buena calidad con rendimiento aceptable.",
   'sierra-lite': "Versión ligera de Sierra con solo 4 píxeles. Muy rápido, ideal para preview o imágenes grandes. Similar a Floyd-Steinberg pero más simple.",
@@ -111,6 +115,8 @@ const ALGORITHM_NAMES = {
   'bayer': "Bayer",
   'blue-noise': "Blue Noise",
   'variable-error': "Variable Error",
+  
+  // ============== NUEVOS ALGORITMOS ==============
   'jarvis-judice-ninke': "Jarvis-Judice-Ninke",
   'sierra': "Sierra",
   'sierra-lite': "Sierra Lite",
