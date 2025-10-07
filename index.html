@@ -27,7 +27,7 @@
             Atajos (?)
           </button>
         </div>
-        <div class="text-xs text-gray-500 -mt-2 mb-4">v6.0 - Enhanced Edition</div>
+        <div class="text-xs text-gray-500 -mt-2 mb-4">v6.1 - Modulated Edition</div>
         
         <div class="bg-slate-800 rounded-lg p-4">
           <h2 class="font-bold text-cyan-300 mb-3">MEDIO</h2>
@@ -102,7 +102,6 @@
               <option value="floyd-steinberg" selected>Floyd-Steinberg</option>
               <option value="atkinson">Atkinson</option>
               <option value="stucki">Stucki</option>
-              <!-- NUEVOS ALGORITMOS -->
               <option value="jarvis-judice-ninke">Jarvis-Judice-Ninke</option>
               <option value="sierra">Sierra</option>
               <option value="sierra-lite">Sierra Lite</option>
@@ -156,7 +155,6 @@
             </div>
           </div>
           
-          <!-- Controles básicos (existentes) -->
           <div id="basicImageControls" class="space-y-3">
             <label class="block">
               <span class="text-sm">Brillo: <span id="brightnessVal">0</span></span>
@@ -172,17 +170,16 @@
             </label>
           </div>
           
-          <!-- Editor de Curvas (NUEVO) -->
           <div id="curvesEditor" class="hidden space-y-3">
             <div class="flex gap-2 mb-2">
-              <button class="curve-channel-btn flex-1 bg-slate-600 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="rgb">RGB</button>
+              <button class="curve-channel-btn flex-1 bg-slate-600 px-2 py-1 rounded text-xs hover:bg-slate-500 active" data-channel="rgb">RGB</button>
               <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="r">R</button>
               <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="g">G</button>
               <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="b">B</button>
             </div>
             
-            <div class="curves-canvas-container" style="position: relative; background: #1f2937; border-radius: 8px; padding: 8px;">
-              <canvas id="curvesCanvas" width="280" height="280" style="cursor: crosshair; display: block;"></canvas>
+            <div class="curves-canvas-container">
+              <canvas id="curvesCanvas" width="280" height="280"></canvas>
               <div class="text-xs text-gray-500 mt-2 flex justify-between">
                 <span>Sombras</span>
                 <span id="curvePointInfo" class="text-cyan-400"></span>
@@ -216,6 +213,24 @@
                <span class="text-sm">Fuerza: <span id="diffusionStrengthVal">100</span>%</span>
                <input id="diffusionStrengthSlider" type="range" min="0" max="150" value="100" class="w-full"/>
              </label>
+             <div class="mt-3 pt-3 border-t border-slate-600">
+                <label class="block text-sm font-medium text-cyan-200">Modular Fuerza por:</label>
+                <select id="diffusionModulationSource" class="w-full bg-slate-700 p-1 rounded text-white text-xs mt-1">
+                  <option value="none">Ninguna (Fijo)</option>
+                  <option value="luma-inverted">Luminancia (Sombras > Luces)</option>
+                  <option value="luma-normal">Luminancia (Luces > Sombras)</option>
+                </select>
+                <div id="diffusionModulationControls" class="hidden mt-2 space-y-2">
+                  <label class="block">
+                    <span class="text-xs">Fuerza Mínima: <span id="diffusionStrengthMinVal">30</span>%</span>
+                    <input id="diffusionStrengthMinSlider" type="range" min="0" max="150" value="30" class="w-full"/>
+                  </label>
+                  <label class="block">
+                    <span class="text-xs">Fuerza Máxima: <span id="diffusionStrengthMaxVal">100</span>%</span>
+                    <input id="diffusionStrengthMaxSlider" type="range" min="0" max="150" value="100" class="w-full"/>
+                  </label>
+                </div>
+              </div>
           </div>
           <div id="orderedDitherControls" class="space-y-3 hidden pt-3 border-t border-slate-700">
              <label class="block">
