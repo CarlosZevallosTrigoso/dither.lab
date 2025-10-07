@@ -50,7 +50,8 @@ class AppState {
       patternStrength: 0.5,
       brightness: 0,
       contrast: 1.0,
-      saturation: 1.0
+      saturation: 1.0,
+      curvesLUTs: null // Añadido para guardar las LUTs de las curvas
     };
     
     this.timeline = {
@@ -87,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bayerLUT = new BayerLUT();
     const blueNoiseLUT = new BlueNoiseLUT();
     const ui = new UIManager();
+    const curvesEditor = new CurvesEditor('curvesCanvas'); // Inicializar el editor de curvas
     
     // OPTIMIZACIÓN FASE 1: Usar CircularBuffer en lugar de arrays
     const fpsHistory = new CircularBuffer(30);
@@ -131,10 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     p.draw = () => {
       // OPTIMIZACIÓN FASE 1: Lógica de lazy draw
-      // Para videos: siempre dibuja si está cargado (independiente de isPlaying)
-      // Para imágenes: solo dibuja cuando needsRedraw es true
       if (appState.mediaType === 'image' && !needsRedraw) {
-        return; // Salir temprano para imágenes sin cambios
+        return;
       }
       
       p.background(0);
@@ -155,6 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       
+      // Actualizar las LUTs de las curvas en el estado de la app
+      appState.updateConfig({ curvesLUTs: curvesEditor.getAllLUTs() });
+
       const cfg = appState.config;
       const isDitheringActive = cfg.effect !== 'none';
       
@@ -178,21 +181,25 @@ document.addEventListener('DOMContentLoaded', () => {
         
         p.image(buffer, 0, 0, p.width, p.height);
       } else {
-        p.image(appState.media, 0, 0, p.width, p.height);
+        // AUNQUE NO HAYA DITHERING, SE PUEDEN APLICAR AJUSTES DE IMAGEN
+        const buffer = bufferPool.get(p.width, p.height, p);
+        buffer.image(appState.media, 0, 0, p.width, p.height);
+        buffer.loadPixels();
+        applyImageAdjustments(buffer.pixels, cfg);
+        buffer.updatePixels();
+        p.image(buffer, 0, 0, p.width, p.height);
       }
       
       if (updateTimelineUI && appState.mediaType === 'video') updateTimelineUI();
       updateFrameStats();
       
-      // OPTIMIZACIÓN FASE 1: Solo marcar como no-redibujar para imágenes
       if (appState.mediaType === 'image') {
         needsRedraw = false;
       }
     };
 
-    // ============================================================================
-    // OPTIMIZACIÓN FASE 2: K-Means con Early Stopping
-    // ============================================================================
+    // ... (El resto de las funciones como generatePaletteFromMedia, calculateCanvasDimensions, etc. se mantienen igual)
+    
     async function generatePaletteFromMedia(media, colorCount) {
         ui.elements.status.textContent = 'Analizando colores...';
         showToast('Generando paleta desde el medio...');
@@ -213,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
             pixels.push([tempCanvas.pixels[i], tempCanvas.pixels[i+1], tempCanvas.pixels[i+2]]);
         }
 
-        // K-Means con early stopping
         const colorDist = (c1, c2) => {
           const dr = c1[0] - c2[0];
           const dg = c1[1] - c2[1];
@@ -221,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
           return Math.sqrt(dr * dr + dg * dg + db * db);
         };
         
-        // OPTIMIZACIÓN FASE 2: Mejor inicialización usando K-means++
         let centroids = [];
         centroids.push([...pixels[Math.floor(Math.random() * pixels.length)]]);
         
@@ -249,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const assignments = new Array(pixels.length);
         let previousCentroids = null;
         
-        // OPTIMIZACIÓN FASE 2: Early stopping
         const centroidsEqual = (a, b, threshold = 1) => {
           return a.every((c, i) => 
             Math.abs(c[0] - b[i][0]) < threshold &&
@@ -259,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         for (let iter = 0; iter < 10; iter++) {
-            // Asignar píxeles
             for (let i = 0; i < pixels.length; i++) {
                 let minDist = Infinity;
                 let bestCentroid = 0;
@@ -273,7 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 assignments[i] = bestCentroid;
             }
 
-            // Recalcular centroides
             const newCentroids = new Array(colorCount).fill(0).map(() => [0,0,0]);
             const counts = new Array(colorCount).fill(0);
             
@@ -295,7 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // OPTIMIZACIÓN FASE 2: Early stopping cuando converge
             if (previousCentroids && centroidsEqual(centroids, previousCentroids)) {
                 console.log(`K-Means convergió en ${iter + 1} iteraciones`);
                 break;
@@ -305,56 +306,43 @@ document.addEventListener('DOMContentLoaded', () => {
         
         tempCanvas.remove();
         
-        // Ordenar por luminosidad
         const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
         centroids.sort((a,b) => (a[0]*0.299 + a[1]*0.587 + a[2]*0.114) - (b[0]*0.299 + b[1]*0.587 + b[2]*0.114));
 
         return centroids.map(toHex);
     }
     
-    // ============================================================================
-    // FIX DE REDIMENSIONAMIENTO: Nueva función calculateCanvasDimensions
-    // ============================================================================
     function calculateCanvasDimensions(mediaWidth, mediaHeight) {
       const container = document.getElementById('canvasContainer');
       
-      // Asegurar que el container tenga dimensiones válidas
       let containerWidth = container.clientWidth || window.innerWidth;
       let containerHeight = container.clientHeight || window.innerHeight;
       
-      // Validar que las dimensiones sean razonables
       if (containerWidth < 100) containerWidth = 800;
       if (containerHeight < 100) containerHeight = 600;
       
-      // Padding más generoso para asegurar que la imagen se vea completa
       const padding = 64;
       const availableWidth = containerWidth - padding;
       const availableHeight = containerHeight - padding;
       
-      // Validar dimensiones disponibles
       if (availableWidth <= 0 || availableHeight <= 0) {
         console.warn('Dimensiones de contenedor inválidas, usando valores por defecto');
         return { width: 400, height: 225 };
       }
       
-      // Calcular aspect ratios
       const mediaAspect = mediaWidth / mediaHeight;
       const containerAspect = availableWidth / availableHeight;
       
       let canvasW, canvasH;
       
-      // Determinar cómo escalar basándose en qué dimensión es limitante
       if (mediaAspect > containerAspect) {
-        // La imagen es más ancha proporcionalmente -> limitar por ancho
         canvasW = Math.min(mediaWidth, availableWidth);
         canvasH = canvasW / mediaAspect;
       } else {
-        // La imagen es más alta proporcionalmente -> limitar por alto
         canvasH = Math.min(mediaHeight, availableHeight);
         canvasW = canvasH * mediaAspect;
       }
       
-      // Asegurar que las dimensiones finales sean válidas y enteras
       canvasW = Math.max(100, Math.floor(canvasW));
       canvasH = Math.max(100, Math.floor(canvasH));
       
@@ -362,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       return { width: canvasW, height: canvasH };
     }
-    
+
     function initializeEventListeners() {
       // Drag & Drop
       document.body.addEventListener("dragover", e => {
@@ -386,7 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.restartBtn.addEventListener("click", () => {
         if (appState.media && appState.mediaType === 'video') {
           appState.media.time(0);
-          // Forzar actualización inmediata
           setTimeout(triggerRedraw, 50);
           showToast('Reiniciado');
         }
@@ -404,7 +391,6 @@ document.addEventListener('DOMContentLoaded', () => {
         triggerRedraw();
       });
       
-      // OPTIMIZACIÓN FASE 2: Debounce para colorCount pero con feedback inmediato
       const debouncedColorCountChange = debounce((value) => {
         appState.updateConfig({ colorCount: parseInt(value) });
         ui.updateColorPickers(appState, colorCache, lumaLUT, p, true);
@@ -422,13 +408,12 @@ document.addEventListener('DOMContentLoaded', () => {
         triggerRedraw();
       });
 
-      // OPTIMIZACIÓN FASE 2: Throttle para sliders de imagen con feedback inmediato
       const brightnessHandler = throttle(e => {
         const value = parseInt(e.target.value);
         appState.updateConfig({ brightness: value });
         ui.elements.brightnessVal.textContent = value;
         triggerRedraw();
-      }, 16); // ~60fps
+      }, 16);
 
       const contrastHandler = throttle(e => {
         const value = parseInt(e.target.value);
@@ -456,11 +441,47 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.elements.brightnessVal.textContent = 0;
         ui.elements.contrastVal.textContent = 100;
         ui.elements.saturationVal.textContent = 100;
+        curvesEditor.resetAllChannels(); // También resetea las curvas
         triggerRedraw();
         showToast('Ajustes de imagen reseteados');
       });
       
-      // OPTIMIZACIÓN FASE 2: Throttle para ditherScale
+      // ============================================================================
+      // FIX: AÑADIR EVENT LISTENER PARA EL BOTÓN DE CURVAS
+      // ============================================================================
+      const toggleCurvesBtn = document.getElementById('toggleCurvesBtn');
+      const basicControls = document.getElementById('basicImageControls');
+      const curvesEditorEl = document.getElementById('curvesEditor');
+
+      toggleCurvesBtn.addEventListener('click', () => {
+        basicControls.classList.toggle('hidden');
+        curvesEditorEl.classList.toggle('hidden');
+        
+        // Si se muestra el editor, redibujar por si acaso
+        if (!curvesEditorEl.classList.contains('hidden')) {
+          curvesEditor.render();
+        }
+      });
+      
+      // Event listeners para los botones dentro del editor de curvas
+      document.querySelectorAll('.curve-channel-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.curve-channel-btn').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          curvesEditor.setChannel(e.target.dataset.channel);
+        });
+      });
+      
+      document.getElementById('resetCurveBtn').addEventListener('click', () => {
+        curvesEditor.resetChannel(curvesEditor.currentChannel);
+        triggerRedraw();
+      });
+      
+      document.getElementById('resetAllCurvesBtn').addEventListener('click', () => {
+        curvesEditor.resetAllChannels();
+        triggerRedraw();
+      });
+
       const ditherScaleHandler = throttle(e => {
         appState.updateConfig({ ditherScale: parseInt(e.target.value) });
         ui.elements.ditherScaleVal.textContent = e.target.value;
@@ -474,7 +495,6 @@ document.addEventListener('DOMContentLoaded', () => {
         triggerRedraw();
       });
       
-      // OPTIMIZACIÓN FASE 2: Throttle para diffusion strength
       const diffusionHandler = throttle(e => {
         appState.updateConfig({ diffusionStrength: parseInt(e.target.value) / 100 });
         ui.elements.diffusionStrengthVal.textContent = e.target.value;
@@ -483,7 +503,6 @@ document.addEventListener('DOMContentLoaded', () => {
       
       ui.elements.diffusionStrengthSlider.addEventListener("input", diffusionHandler);
       
-      // OPTIMIZACIÓN FASE 2: Throttle para pattern strength
       const patternHandler = throttle(e => {
         appState.updateConfig({ patternStrength: parseInt(e.target.value) / 100 });
         ui.elements.patternStrengthVal.textContent = e.target.value;
@@ -491,6 +510,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 16);
       
       ui.elements.patternStrengthSlider.addEventListener("input", patternHandler);
+      
+      // ... (El resto de los listeners como Timeline, Exportación, Presets, etc., se mantienen igual)
       
       // Timeline
       ui.elements.setInBtn.addEventListener('click', () => {
@@ -539,7 +560,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.update({ isPlaying: false });
         ui.elements.playBtn.textContent = 'Play';
         appState.media.time(Math.max(0, appState.media.time() - 1/30));
-        // Forzar actualización inmediata
         setTimeout(triggerRedraw, 50);
       });
       
@@ -549,7 +569,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.update({ isPlaying: false });
         ui.elements.playBtn.textContent = 'Play';
         appState.media.time(Math.min(appState.media.duration(), appState.media.time() + 1/30));
-        // Forzar actualización inmediata
         setTimeout(triggerRedraw, 50);
       });
       
@@ -599,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const name = ui.elements.presetNameInput.value.trim();
         if (name) {
           const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}");
-          presets[name] = appState.config;
+          presets[name] = { ...appState.config, curves: curvesEditor.curves };
           localStorage.setItem("dither_presets", JSON.stringify(presets));
           ui.elements.presetNameInput.value = "";
           updatePresetList();
@@ -650,6 +669,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.updateMetricsBtn.addEventListener('click', updateMetrics);
     }
     
+    // ... (handleFile, togglePlay, etc., se mantienen mayormente igual)
+    // Se debe modificar 'applyPreset' para que también cargue las curvas.
+    
     async function handleFile(file) {
       if (appState.media) {
         if (appState.mediaType === 'video') {
@@ -682,18 +704,11 @@ document.addEventListener('DOMContentLoaded', () => {
           let w = media.width;
           let h = media.height;
           
-          // Redimensionar el video si excede maxDim
           if (w > maxDim || h > maxDim) {
-            if (w > h) { 
-              h = Math.floor(h * (maxDim / w)); 
-              w = maxDim; 
-            } else { 
-              w = Math.floor(w * (maxDim / h)); 
-              h = maxDim; 
-            }
+            if (w > h) { h = Math.floor(h * (maxDim / w)); w = maxDim; }
+            else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
           }
           
-          // ✅ FIX: Usar nueva función de cálculo
           const { width: canvasW, height: canvasH } = calculateCanvasDimensions(w, h);
           p.resizeCanvas(canvasW, canvasH);
           
@@ -731,19 +746,12 @@ document.addEventListener('DOMContentLoaded', () => {
           let w = media.width;
           let h = media.height;
           
-          // Redimensionar la imagen si excede maxDim
           if (w > maxDim || h > maxDim) {
-            if (w > h) { 
-              h = Math.floor(h * (maxDim / w)); 
-              w = maxDim; 
-            } else { 
-              w = Math.floor(w * (maxDim / h)); 
-              h = maxDim; 
-            }
+            if (w > h) { h = Math.floor(h * (maxDim / w)); w = maxDim; }
+            else { w = Math.floor(w * (maxDim / h)); h = maxDim; }
             media.resize(w, h);
           }
           
-          // ✅ FIX: Usar nueva función de cálculo
           const { width: canvasW, height: canvasH } = calculateCanvasDimensions(w, h);
           p.resizeCanvas(canvasW, canvasH);
           
@@ -772,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     }
-    
+
     function togglePlay() {
       if (!appState.media || appState.mediaType !== 'video') return;
       
@@ -787,7 +795,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       appState.update({ isPlaying: !appState.isPlaying });
     }
-    
+
+    // ... (start/stopRecording y exportGif se mantienen igual)
     function startRecording() {
       if (appState.isRecording || !appState.media || appState.mediaType !== 'video') return;
       
@@ -929,7 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.exportGifBtn.disabled = false;
       ui.elements.gifProgress.classList.add('hidden');
     }
-    
+
     function updateMetrics() {
       if (!appState.media) { showToast('Carga un medio primero'); return; }
       
@@ -959,8 +968,9 @@ document.addEventListener('DOMContentLoaded', () => {
       origBuffer.remove();
       showToast('Métricas actualizadas');
     }
-    
+
     function setupTimeline() {
+      //... (se mantiene igual)
       const timeline = ui.elements.timeline;
       const scrubber = ui.elements.timelineScrubber;
       const progress = ui.elements.timelineProgress;
@@ -1055,8 +1065,9 @@ document.addEventListener('DOMContentLoaded', () => {
       
       return updateTimelineUI;
     }
-    
+
     function setupKeyboardShortcuts() {
+      //... (se mantiene igual)
       document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
         
@@ -1081,8 +1092,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
-    
+
     function toggleFullscreen() {
+      //... (se mantiene igual)
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
         showToast('Pantalla completa');
@@ -1091,8 +1103,9 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Salir de pantalla completa');
       }
     }
-    
+
     function updatePresetList() {
+      //... (se mantiene igual)
       const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}");
       ui.elements.presetSelect.innerHTML = '<option value="">Cargar Preset...</option>';
       for (const name in presets) {
@@ -1102,13 +1115,22 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.elements.presetSelect.appendChild(option);
       }
     }
-    
+
     function applyPreset(name) {
       const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}");
       if (!presets[name]) return;
       
-      const cfg = presets[name];
+      const presetData = presets[name];
+      const cfg = { ...appState.config, ...presetData };
+      delete cfg.curves; // No aplicar las curvas directamente a la config
+
       appState.updateConfig(cfg);
+      
+      // Cargar las curvas si existen en el preset
+      if (presetData.curves) {
+        curvesEditor.curves = presetData.curves;
+        curvesEditor.render();
+      }
       
       ui.elements.effectSelect.value = cfg.effect;
       ui.elements.monochromeToggle.checked = cfg.isMonochrome;
@@ -1137,8 +1159,9 @@ document.addEventListener('DOMContentLoaded', () => {
       triggerRedraw();
       showToast(`Preset "${name}" cargado`);
     }
-    
+
     function updateFrameStats() {
+      //... (se mantiene igual)
       const fps = p.frameRate();
       fpsHistory.push(fps);
       frameTimeHistory.push(p.deltaTime);
@@ -1167,7 +1190,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.effectName.textContent = ALGORITHM_NAMES[appState.config.effect] || "Desconocido";
     }
     
-    // OPTIMIZACIÓN: Cleanup periódico del buffer pool
     setInterval(() => {
       bufferPool.cleanup(60000);
     }, 60000);
