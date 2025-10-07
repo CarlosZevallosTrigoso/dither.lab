@@ -19,6 +19,10 @@ class BufferPool {
         alpha: false // OPTIMIZACIÓN: Sin alpha si no se usa transparencia
       });
       buffer.pixelDensity(1);
+      
+      // ✨ FIX PARA ESCALA: Renderizado pixelado sin blur en buffers
+      buffer.elt.style.imageRendering = 'pixelated';
+      
       this.buffers.set(key, buffer);
     }
     return this.buffers.get(key);
