@@ -76,7 +76,7 @@ class AppState {
 document.addEventListener('DOMContentLoaded', () => {
   const sketch = p => {
     let canvas, currentFileURL = null, updateTimelineUI = null;
-    let recorder, chunks = [], originalDitherScale, originalCanvasWidth, originalCanvasHeight;
+    let recorder, chunks = [], originalCanvasWidth, originalCanvasHeight;
     
     // OPTIMIZACIÓN FASE 1: Flag para controlar redibujado
     let needsRedraw = true;
@@ -796,9 +796,6 @@ document.addEventListener('DOMContentLoaded', () => {
       originalCanvasWidth = p.width;
       originalCanvasHeight = p.height;
       
-      const recordScale = parseInt(ui.elements.recordQuality.value);
-      appState.updateConfig({ ditherScale: recordScale });
-      
       let startTime = 0;
       let endTime = appState.media.duration();
       
@@ -853,7 +850,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 100);
         
-        appState.updateConfig({ ditherScale: originalDitherScale });
         p.resizeCanvas(originalCanvasWidth, originalCanvasHeight);
         
         ui.elements.status.textContent = 'WebM descargado';
