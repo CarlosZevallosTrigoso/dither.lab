@@ -2,6 +2,10 @@
 
 <div align="center">
 
+![DitherLab](https://img.shields.io/badge/DitherLab-v6.0-06b6d4?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCBmaWxsPSIjMDZiNmQ0IiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IndoaXRlIj5EPC90ZXh0Pjwvc3ZnPg==)
+![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-active-success?style=for-the-badge)
+
 **Una herramienta web para aplicar efectos de tramado (dithering) a imágenes y videos en tiempo real.**
 
 [Demo en Vivo](https://carloszevallostrigoso.github.io/dither.lab/) • [Reportar un Bug](https://github.com/CarlosZevallosTrigoso/dither.lab/issues)
@@ -64,9 +68,3 @@ DitherLab incluye una selección curada de algoritmos de tramado, cada uno con u
 * **Posterize**: Reduce los colores sin tramado, creando un efecto de "banding".
 
 ---
-
-
-
-
-
-
