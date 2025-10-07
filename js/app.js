@@ -51,7 +51,7 @@ class AppState {
       brightness: 0,
       contrast: 1.0,
       saturation: 1.0,
-      curvesLUTs: null
+      curvesLUTs: null,
       algorithmParams: {}  // ⭐ NUEVO: Parámetros específicos por algoritmo
 
     };
@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sketch = p => {
     let canvas, currentFileURL = null, updateTimelineUI = null;
     let recorder, chunks = [], originalCanvasWidth, originalCanvasHeight;
+    let originalDitherScale;
     
     // OPTIMIZACIÓN FASE 1: Flag para controlar redibujado
     let needsRedraw = true;
@@ -132,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.init();
 
       // ⭐ NUEVO: Inicializar gestor de parámetros dinámicos
-      const paramsManager = new AlgorithmParamsManager(appState, ui);
+      paramsManager = new AlgorithmParamsManager(appState, ui);
       paramsManager.init();  
 
       initializeEventListeners();
