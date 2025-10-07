@@ -51,9 +51,7 @@ class AppState {
       brightness: 0,
       contrast: 1.0,
       saturation: 1.0,
-      curvesLUTs: null,
-      algorithmParams: {}  // ⭐ NUEVO: Parámetros específicos por algoritmo
-
+      curvesLUTs: null
     };
     
     this.timeline = {
@@ -79,12 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const sketch = p => {
     let canvas, currentFileURL = null, updateTimelineUI = null;
     let recorder, chunks = [], originalCanvasWidth, originalCanvasHeight;
-    let originalDitherScale;
     
     // OPTIMIZACIÓN FASE 1: Flag para controlar redibujado
     let needsRedraw = true;
-    let paramsManager = null; // ⭐ NUEVO: Declarar paramsManager
-
     
     const appState = new AppState();
     const bufferPool = new BufferPool();
@@ -131,20 +126,9 @@ document.addEventListener('DOMContentLoaded', () => {
       lumaLUT.build(p5colors, p);
       
       ui.init();
-
-      // ⭐ NUEVO: Inicializar gestor de parámetros dinámicos
-      paramsManager = new AlgorithmParamsManager(appState, ui);
-      paramsManager.init();  
-
       initializeEventListeners();
       ui.updateColorPickers(appState, colorCache, lumaLUT, p);
       ui.updatePanelsVisibility(appState.config);
-
-      // ⭐ NUEVO: Renderizar controles específicos del algoritmo
-      if (paramsManager) {
-      paramsManager.renderControls(appState.config.effect);
-      }
-
       updatePresetList();
       setupKeyboardShortcuts();
       
@@ -495,6 +479,35 @@ document.addEventListener('DOMContentLoaded', () => {
         curvesEditor.resetAllChannels();
         triggerRedraw();
       });
+
+      const ditherScaleHandler = throttle(e => {
+        appState.updateConfig({ ditherScale: parseInt(e.target.value) });
+        ui.elements.ditherScaleVal.textContent = e.target.value;
+        triggerRedraw();
+      }, 16);
+      
+      ui.elements.ditherScale.addEventListener("input", ditherScaleHandler);
+      
+      ui.elements.serpentineToggle.addEventListener("change", e => {
+        appState.updateConfig({ serpentineScan: e.target.checked });
+        triggerRedraw();
+      });
+      
+      const diffusionHandler = throttle(e => {
+        appState.updateConfig({ diffusionStrength: parseInt(e.target.value) / 100 });
+        ui.elements.diffusionStrengthVal.textContent = e.target.value;
+        triggerRedraw();
+      }, 16);
+      
+      ui.elements.diffusionStrengthSlider.addEventListener("input", diffusionHandler);
+      
+      const patternHandler = throttle(e => {
+        appState.updateConfig({ patternStrength: parseInt(e.target.value) / 100 });
+        ui.elements.patternStrengthVal.textContent = e.target.value;
+        triggerRedraw();
+      }, 16);
+      
+      ui.elements.patternStrengthSlider.addEventListener("input", patternHandler);
       
       // Timeline
       ui.elements.setInBtn.addEventListener('click', () => {
@@ -598,24 +611,16 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Presets
       ui.elements.savePresetBtn.addEventListener("click", () => {
-      const name = ui.elements.presetNameInput.value.trim();
-      if (name) {
-      const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}");
-    
-      // ⭐ MODIFICADO: Incluir algorithmParams en el preset
-      presets[name] = { 
-      ...appState.config, 
-      curves: curvesEditor.curves,
-      algorithmParams: appState.config.algorithmParams // ⭐ NUEVO
-      };
-    
-      localStorage.setItem("dither_presets", JSON.stringify(presets));
-      ui.elements.presetNameInput.value = "";
-      updatePresetList();
-      showToast(`Preset "${name}" guardado`);
-      }
+        const name = ui.elements.presetNameInput.value.trim();
+        if (name) {
+          const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}");
+          presets[name] = { ...appState.config, curves: curvesEditor.curves };
+          localStorage.setItem("dither_presets", JSON.stringify(presets));
+          ui.elements.presetNameInput.value = "";
+          updatePresetList();
+          showToast(`Preset "${name}" guardado`);
+        }
       });
-
       
       ui.elements.deletePresetBtn.addEventListener("click", () => {
         const name = ui.elements.presetSelect.value;
@@ -1109,23 +1114,16 @@ document.addEventListener('DOMContentLoaded', () => {
         curvesEditor.curves = presetData.curves;
         curvesEditor.render();
       }
-
-      // ⭐ NUEVO: Aplicar algorithmParams si existen en el preset
-      if (presetData.algorithmParams && paramsManager) {
-      Object.entries(presetData.algorithmParams).forEach(([algorithm, params]) => {
-      paramsManager.setParams(algorithm, params);
-      });
-      }
       
       ui.elements.effectSelect.value = cfg.effect;
       ui.elements.monochromeToggle.checked = cfg.isMonochrome;
       ui.elements.originalColorToggle.checked = cfg.useOriginalColor;
       ui.elements.colorCountSlider.value = cfg.colorCount;
+      ui.elements.ditherScale.value = cfg.ditherScale;
+      ui.elements.serpentineToggle.checked = cfg.serpentineScan;
+      ui.elements.diffusionStrengthSlider.value = cfg.diffusionStrength * 100;
+      ui.elements.patternStrengthSlider.value = cfg.patternStrength * 100;
       
-      if (paramsManager) {
-      paramsManager.renderControls(cfg.effect);
-      }
-
       ui.elements.brightnessSlider.value = cfg.brightness || 0;
       ui.elements.contrastSlider.value = (cfg.contrast || 1.0) * 100;
       ui.elements.saturationSlider.value = (cfg.saturation || 1.0) * 100;
@@ -1134,6 +1132,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.saturationVal.textContent = (cfg.saturation || 1.0) * 100;
 
       ui.elements.colorCountVal.textContent = cfg.colorCount;
+      ui.elements.ditherScaleVal.textContent = cfg.ditherScale;
+      ui.elements.diffusionStrengthVal.textContent = cfg.diffusionStrength * 100;
+      ui.elements.patternStrengthVal.textContent = cfg.patternStrength * 100;
       
       ui.updateColorPickers(appState, colorCache, lumaLUT, p);
       ui.updatePanelsVisibility(cfg);
