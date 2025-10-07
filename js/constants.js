@@ -31,8 +31,6 @@ const KERNELS = {
       {dx:-2, dy:2, w:1}, {dx:-1, dy:2, w:2}, {dx:0, dy:2, w:4}, {dx:1, dy:2, w:2}, {dx:2, dy:2, w:1}
     ]
   },
-  
-  // ============== NUEVOS ALGORITMOS ==============
   'jarvis-judice-ninke': {
     divisor: 48,
     points: [
@@ -65,6 +63,30 @@ const KERNELS = {
   }
 };
 
+// NUEVO: Matrices de Bayer de diferentes tamaños
+const BAYER_MATRICES = {
+  2: [
+    [0, 2],
+    [3, 1]
+  ],
+  4: [
+    [0, 8, 2, 10],
+    [12, 4, 14, 6],
+    [3, 11, 1, 9],
+    [15, 7, 13, 5]
+  ],
+  8: [
+    [0, 32, 8, 40, 2, 34, 10, 42],
+    [48, 16, 56, 24, 50, 18, 58, 26],
+    [12, 44, 4, 36, 14, 46, 6, 38],
+    [60, 28, 52, 20, 62, 30, 54, 22],
+    [3, 35, 11, 43, 1, 33, 9, 41],
+    [51, 19, 59, 27, 49, 17, 57, 25],
+    [15, 47, 7, 39, 13, 45, 5, 37],
+    [63, 31, 55, 23, 61, 29, 53, 21]
+  ]
+};
+
 const ALGORITHM_INFO = {
   'none': "Muestra el medio original sin procesamiento.",
   'posterize': "Reduce los colores sin tramado. Útil para ver el 'banding' de color puro.",
@@ -74,8 +96,6 @@ const ALGORITHM_INFO = {
   'bayer': 'Dithering ordenado con matriz de umbrales fija. Produce un patrón geométrico característico. Extremadamente rápido, estética retro.',
   'blue-noise': "Dithering ordenado de alta calidad usando ruido azul. Produce patrones menos perceptibles que Bayer, más agradable visualmente.",
   'variable-error': "Algoritmo adaptativo que ajusta la difusión según el contenido local. Preserva mejor los bordes y detalles finos.",
-  
-  // ============== NUEVOS ALGORITMOS ==============
   'jarvis-judice-ninke': "Difusión de error a 12 píxeles. Mayor área de difusión que Floyd-Steinberg, produce resultados muy suaves con menos artefactos.",
   'sierra': "Variante de difusión de error con 10 píxeles. Balance entre Stucki y Floyd-Steinberg. Buena calidad con rendimiento aceptable.",
   'sierra-lite': "Versión ligera de Sierra con solo 4 píxeles. Muy rápido, ideal para preview o imágenes grandes. Similar a Floyd-Steinberg pero más simple.",
@@ -91,8 +111,6 @@ const ALGORITHM_NAMES = {
   'bayer': "Bayer",
   'blue-noise': "Blue Noise",
   'variable-error': "Variable Error",
-  
-  // ============== NUEVOS ALGORITMOS ==============
   'jarvis-judice-ninke': "Jarvis-Judice-Ninke",
   'sierra': "Sierra",
   'sierra-lite': "Sierra Lite",
