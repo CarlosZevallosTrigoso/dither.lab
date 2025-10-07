@@ -27,7 +27,7 @@
             Atajos (?)
           </button>
         </div>
-        <div class="text-xs text-gray-500 -mt-2 mb-4">v6.1 - Modulated Edition</div>
+        <div class="text-xs text-gray-500 -mt-2 mb-4">v6.2 - Artistic Edition</div>
         
         <div class="bg-slate-800 rounded-lg p-4">
           <h2 class="font-bold text-cyan-300 mb-3">MEDIO</h2>
@@ -177,21 +177,18 @@
               <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="g">G</button>
               <button class="curve-channel-btn flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-500" data-channel="b">B</button>
             </div>
-            
-            <div class="curves-canvas-container" style="position: relative; background: #1f2937; border-radius: 8px; padding: 8px;">
-              <canvas id="curvesCanvas" width="280" height="280" style="cursor: crosshair; display: block;"></canvas>
+            <div class="curves-canvas-container">
+              <canvas id="curvesCanvas" width="280" height="280"></canvas>
               <div class="text-xs text-gray-500 mt-2 flex justify-between">
                 <span>Sombras</span>
                 <span id="curvePointInfo" class="text-cyan-400"></span>
                 <span>Luces</span>
               </div>
             </div>
-            
             <div class="flex gap-2">
               <button id="resetCurveBtn" class="flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-600">Resetear Curva</button>
               <button id="resetAllCurvesBtn" class="flex-1 bg-slate-700 px-2 py-1 rounded text-xs hover:bg-slate-600">Resetear Todo</button>
             </div>
-            
             <div class="text-xs text-gray-400 mt-2">
               💡 Click para agregar puntos, arrastra para mover, doble-click para eliminar
             </div>
@@ -199,40 +196,29 @@
         </div>
         
         <div id="ditherControls" class="bg-slate-800 rounded-lg p-4 hidden">
-          <h3 class="font-bold text-green-300 mb-3">CONTROLES AVANZADOS</h3>
-          <label class="block mb-3">
-            <span class="text-sm">Escala: <span id="ditherScaleVal">2</span></span>
-            <input id="ditherScale" type="range" min="1" max="10" value="2" class="w-full"/>
-          </label>
-          <div id="errorDiffusionControls" class="space-y-3 hidden pt-3 border-t border-slate-700">
+          <h3 class="font-bold text-green-300 mb-3">CONTROLES DE TRAMADO</h3>
+          
+          <div id="errorDiffusionControls" class="space-y-3 hidden">
+             <label class="block">
+               <span class="text-sm">Cuantización de Error: <span id="errorQuantizationVal">0</span></span>
+               <input id="errorQuantizationSlider" type="range" min="0" max="128" value="0" step="1" class="w-full"/>
+             </label>
              <label class="flex items-center gap-2 cursor-pointer">
                <input id="serpentineToggle" type="checkbox" class="w-4 h-4"/>
                <span class="text-sm">Escaneo en Serpentina</span>
              </label>
+             <hr class="border-slate-700"/>
              <label class="block">
-               <span class="text-sm">Fuerza: <span id="diffusionStrengthVal">100</span>%</span>
+               <span class="text-sm">Fuerza de Difusión: <span id="diffusionStrengthVal">100</span>%</span>
                <input id="diffusionStrengthSlider" type="range" min="0" max="150" value="100" class="w-full"/>
              </label>
-             <div class="mt-3 pt-3 border-t border-slate-600">
-                <label class="block text-sm font-medium text-cyan-200">Modular Fuerza por:</label>
-                <select id="diffusionModulationSource" class="w-full bg-slate-700 p-1 rounded text-white text-xs mt-1">
-                  <option value="none">Ninguna (Fijo)</option>
-                  <option value="luma-inverted">Luminancia (Sombras > Luces)</option>
-                  <option value="luma-normal">Luminancia (Luces > Sombras)</option>
-                </select>
-                <div id="diffusionModulationControls" class="hidden mt-2 space-y-2">
-                  <label class="block">
-                    <span class="text-xs">Fuerza Mínima: <span id="diffusionStrengthMinVal">30</span>%</span>
-                    <input id="diffusionStrengthMinSlider" type="range" min="0" max="150" value="30" class="w-full"/>
-                  </label>
-                  <label class="block">
-                    <span class="text-xs">Fuerza Máxima: <span id="diffusionStrengthMaxVal">100</span>%</span>
-                    <input id="diffusionStrengthMaxSlider" type="range" min="0" max="150" value="100" class="w-full"/>
-                  </label>
-                </div>
-              </div>
           </div>
-          <div id="orderedDitherControls" class="space-y-3 hidden pt-3 border-t border-slate-700">
+          
+          <div id="orderedDitherControls" class="space-y-3 hidden">
+             <label class="block">
+               <span class="text-sm">Tamaño del Patrón: <span id="patternSizeVal">4x4</span></span>
+               <input id="patternSizeSlider" type="range" min="0" max="2" value="1" class="w-full"/>
+             </label>
              <label class="block">
                <span class="text-sm">Fuerza del Patrón: <span id="patternStrengthVal">50</span>%</span>
                <input id="patternStrengthSlider" type="range" min="0" max="100" value="50" class="w-full"/>
@@ -281,28 +267,15 @@
             EXPORTAR
             <span id="recIndicator" class="hidden w-3 h-3 bg-red-500 rounded-full recording-indicator"></span>
           </h2>
-          
           <div class="mb-3">
             <div class="text-xs text-gray-400 mb-2">Video WebM</div>
-            <div class="space-y-2 mb-2">
-              <label class="block">
-                <span class="text-xs">Calidad:</span>
-                <select id="recordQuality" class="w-full bg-slate-700 p-1 rounded text-white text-xs">
-                  <option value="1">Máxima (Scale 1)</option>
-                  <option value="2" selected>Alta (Scale 2)</option>
-                  <option value="3">Media (Scale 3)</option>
-                  <option value="4">Rápida (Scale 4)</option>
-                </select>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer text-xs">
-                <input id="webmUseMarkersToggle" type="checkbox" class="w-4 h-4" checked/>
-                <span>Usar marcadores</span>
-              </label>
-            </div>
+            <label class="flex items-center gap-2 cursor-pointer text-xs mb-2">
+              <input id="webmUseMarkersToggle" type="checkbox" class="w-4 h-4" checked/>
+              <span>Usar marcadores</span>
+            </label>
             <button id="recBtn" class="w-full py-2 bg-red-600 rounded hover:bg-red-500 mb-2" disabled>Grabar WebM</button>
             <button id="stopBtn" class="w-full py-2 bg-gray-700 rounded hover:bg-gray-600 hidden">Detener</button>
           </div>
-          
           <div id="gifExportPanel" class="mb-3 pt-3 border-t border-slate-700 hidden">
             <div class="text-xs text-gray-400 mb-2">GIF Animado</div>
             <div class="space-y-2 mb-2">
@@ -327,7 +300,6 @@
               </div>
             </div>
           </div>
-          
           <div id="spriteSheetPanel" class="mb-3 pt-3 border-t border-slate-700 hidden">
             <div class="text-xs text-gray-400 mb-2">Sprite Sheet</div>
             <div class="space-y-2 mb-2">
@@ -342,18 +314,15 @@
             </div>
             <button id="exportSpriteBtn" class="w-full py-2 bg-pink-600 rounded hover:bg-pink-500">Exportar Sprite</button>
           </div>
-          
           <div class="pt-3 border-t border-slate-700">
             <div class="text-xs text-gray-400 mb-2">Frame Actual</div>
             <button id="downloadImageBtn" class="w-full py-2 bg-cyan-600 rounded hover:bg-cyan-500 mb-2">Exportar PNG</button>
             <button id="exportSequenceBtn" class="w-full py-2 bg-teal-600 rounded hover:bg-teal-500 hidden">Secuencia PNG</button>
           </div>
-          
           <div id="status" class="text-xs text-gray-400 mt-3">Esperando...</div>
         </div>
       </div>
     </div>
-    
     <div id="canvasContainer" class="flex-1 min-w-0 min-h-0 bg-black flex items-center justify-center p-4"></div>
   </div>
 
