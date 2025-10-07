@@ -51,7 +51,7 @@ class AppState {
       brightness: 0,
       contrast: 1.0,
       saturation: 1.0,
-      curvesLUTs: null // Añadido para guardar las LUTs de las curvas
+      curvesLUTs: null
     };
     
     this.timeline = {
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bayerLUT = new BayerLUT();
     const blueNoiseLUT = new BlueNoiseLUT();
     const ui = new UIManager();
-    const curvesEditor = new CurvesEditor('curvesCanvas'); // Inicializar el editor de curvas
+    const curvesEditor = new CurvesEditor('curvesCanvas');
     
     // OPTIMIZACIÓN FASE 1: Usar CircularBuffer en lugar de arrays
     const fpsHistory = new CircularBuffer(30);
@@ -109,6 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       canvas.parent('canvasContainer');
       p.pixelDensity(1);
+      
+      // ✨ FIX PARA ESCALA: Renderizado pixelado sin blur
+      p.noSmooth(); // Desactiva antialiasing en p5.js
+      canvas.elt.style.imageRendering = 'pixelated'; // Fuerza nearest-neighbor en CSS
+      
       p.textFont('monospace');
       p.textStyle(p.BOLD);
       p.textAlign(p.CENTER, p.CENTER);
@@ -198,8 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    // ... (El resto de las funciones como generatePaletteFromMedia, calculateCanvasDimensions, etc. se mantienen igual)
-    
     async function generatePaletteFromMedia(media, colorCount) {
         ui.elements.status.textContent = 'Analizando colores...';
         showToast('Generando paleta desde el medio...');
@@ -441,14 +444,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.elements.brightnessVal.textContent = 0;
         ui.elements.contrastVal.textContent = 100;
         ui.elements.saturationVal.textContent = 100;
-        curvesEditor.resetAllChannels(); // También resetea las curvas
+        curvesEditor.resetAllChannels();
         triggerRedraw();
         showToast('Ajustes de imagen reseteados');
       });
       
-      // ============================================================================
-      // FIX: AÑADIR EVENT LISTENER PARA EL BOTÓN DE CURVAS
-      // ============================================================================
       const toggleCurvesBtn = document.getElementById('toggleCurvesBtn');
       const basicControls = document.getElementById('basicImageControls');
       const curvesEditorEl = document.getElementById('curvesEditor');
@@ -457,13 +457,11 @@ document.addEventListener('DOMContentLoaded', () => {
         basicControls.classList.toggle('hidden');
         curvesEditorEl.classList.toggle('hidden');
         
-        // Si se muestra el editor, redibujar por si acaso
         if (!curvesEditorEl.classList.contains('hidden')) {
           curvesEditor.render();
         }
       });
       
-      // Event listeners para los botones dentro del editor de curvas
       document.querySelectorAll('.curve-channel-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           document.querySelectorAll('.curve-channel-btn').forEach(b => b.classList.remove('active'));
@@ -510,8 +508,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 16);
       
       ui.elements.patternStrengthSlider.addEventListener("input", patternHandler);
-      
-      // ... (El resto de los listeners como Timeline, Exportación, Presets, etc., se mantienen igual)
       
       // Timeline
       ui.elements.setInBtn.addEventListener('click', () => {
@@ -669,9 +665,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ui.elements.updateMetricsBtn.addEventListener('click', updateMetrics);
     }
     
-    // ... (handleFile, togglePlay, etc., se mantienen mayormente igual)
-    // Se debe modificar 'applyPreset' para que también cargue las curvas.
-    
     async function handleFile(file) {
       if (appState.media) {
         if (appState.mediaType === 'video') {
@@ -796,7 +789,6 @@ document.addEventListener('DOMContentLoaded', () => {
       appState.update({ isPlaying: !appState.isPlaying });
     }
 
-    // ... (start/stopRecording y exportGif se mantienen igual)
     function startRecording() {
       if (appState.isRecording || !appState.media || appState.mediaType !== 'video') return;
       
@@ -970,7 +962,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupTimeline() {
-      //... (se mantiene igual)
       const timeline = ui.elements.timeline;
       const scrubber = ui.elements.timelineScrubber;
       const progress = ui.elements.timelineProgress;
@@ -1067,7 +1058,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupKeyboardShortcuts() {
-      //... (se mantiene igual)
       document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
         
@@ -1094,7 +1084,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleFullscreen() {
-      //... (se mantiene igual)
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
         showToast('Pantalla completa');
@@ -1105,7 +1094,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePresetList() {
-      //... (se mantiene igual)
       const presets = JSON.parse(localStorage.getItem("dither_presets") || "{}");
       ui.elements.presetSelect.innerHTML = '<option value="">Cargar Preset...</option>';
       for (const name in presets) {
@@ -1122,11 +1110,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const presetData = presets[name];
       const cfg = { ...appState.config, ...presetData };
-      delete cfg.curves; // No aplicar las curvas directamente a la config
+      delete cfg.curves;
 
       appState.updateConfig(cfg);
       
-      // Cargar las curvas si existen en el preset
       if (presetData.curves) {
         curvesEditor.curves = presetData.curves;
         curvesEditor.render();
@@ -1161,7 +1148,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateFrameStats() {
-      //... (se mantiene igual)
       const fps = p.frameRate();
       fpsHistory.push(fps);
       frameTimeHistory.push(p.deltaTime);
